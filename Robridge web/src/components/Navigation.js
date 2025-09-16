@@ -9,6 +9,8 @@ import {
   FaWarehouse,
   FaWifi,
   FaCog,
+  FaCogs,
+  FaBox,
   FaBars,
   FaTimes,
   FaSignOutAlt,
@@ -30,6 +32,9 @@ const Navigation = () => {
     { path: '/image-processing', icon: FaImage, label: 'Image Processing' },
     { path: '/robot-control', icon: FaRobot, label: 'Robot Status' },
     { path: '/rack-status', icon: FaWarehouse, label: 'Rack Status' },
+    { path: '/rack-management', icon: FaWarehouse, label: 'Rack Management' },
+    { path: '/product-management', icon: FaBox, label: 'Product Management' },
+    { path: '/rack-settings', icon: FaCogs, label: 'Rack Settings' },
     { path: '/device-connected', icon: FaWifi, label: 'Device Connected' },
     { path: '/settings', icon: FaCog, label: 'Settings' }
   ];
@@ -48,8 +53,7 @@ const Navigation = () => {
     <nav className={`navigation ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="nav-header">
         <div className="nav-logo">
-          <img src="/RobBridge.png" alt="RobBridge Logo" className="logo-image" />
-          {!isCollapsed && <h2 className="nav-title">RobBridge</h2>}
+          <img src="/logo.png" alt="RobBridge Logo" className="logo-image" />
         </div>
         <button className="nav-toggle" onClick={toggleCollapse}>
           {isCollapsed ? <FaBars /> : <FaTimes />}

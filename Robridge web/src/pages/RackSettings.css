@@ -1,0 +1,386 @@
+.rack-settings {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  background: #F5F5F5;
+  min-height: 100vh;
+}
+
+.settings-header {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-icon {
+  font-size: 32px;
+  color: #E3821E;
+}
+
+.header-content h1 {
+  margin: 0;
+  font-size: 32px;
+  color: #3D3E41;
+  font-weight: 700;
+}
+
+.header-content p {
+  margin: 0;
+  color: #666;
+  font-size: 16px;
+}
+
+.success-message {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: #E8F5E8;
+  color: #34A853;
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.settings-section {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.settings-section h2 {
+  margin: 0;
+  padding: 20px 24px;
+  background: #F8F9FA;
+  border-bottom: 1px solid #E5E5E5;
+  font-size: 20px;
+  color: #3D3E41;
+  font-weight: 600;
+}
+
+.settings-group {
+  padding: 0;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #F0F0F0;
+  transition: background-color 0.2s ease;
+}
+
+.setting-item:last-child {
+  border-bottom: none;
+}
+
+.setting-item:hover {
+  background: #FAFAFA;
+}
+
+.setting-info {
+  flex: 1;
+  margin-right: 20px;
+}
+
+.setting-info h3 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  color: #3D3E41;
+  font-weight: 600;
+}
+
+.setting-info p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.setting-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+  background-color: #E3821E;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(26px);
+}
+
+/* Input Fields */
+.number-input, .text-input {
+  width: 80px;
+  padding: 8px 12px;
+  border: 1px solid #DDD;
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: center;
+  transition: border-color 0.2s ease;
+}
+
+.number-input:focus, .text-input:focus {
+  outline: none;
+  border-color: #E3821E;
+  box-shadow: 0 0 0 2px rgba(227, 130, 30, 0.2);
+}
+
+.text-input {
+  width: 120px;
+  text-align: left;
+}
+
+.unit {
+  font-size: 14px;
+  color: #666;
+  margin-left: 4px;
+}
+
+/* Select Dropdown */
+.select-input {
+  width: 160px;
+  padding: 8px 32px 8px 12px;
+  border: 1px solid #DDD;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  appearance: none;
+  transition: border-color 0.2s ease;
+}
+
+.select-input:focus {
+  outline: none;
+  border-color: #E3821E;
+  box-shadow: 0 0 0 2px rgba(227, 130, 30, 0.2);
+}
+
+.select-icon {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  pointer-events: none;
+}
+
+.setting-control {
+  position: relative;
+}
+
+/* Action Buttons */
+.settings-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  padding: 24px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.save-btn, .reset-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 160px;
+  justify-content: center;
+}
+
+.save-btn {
+  background: #E3821E;
+  color: white;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: #D4731A;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(227, 130, 30, 0.3);
+}
+
+.save-btn:disabled {
+  background: #CCC;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.reset-btn {
+  background: #F5F5F5;
+  color: #666;
+  border: 1px solid #DDD;
+}
+
+.reset-btn:hover {
+  background: #EEEEEE;
+  color: #333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .rack-settings {
+    padding: 16px;
+  }
+
+  .settings-header {
+    padding: 20px;
+  }
+
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .header-content h1 {
+    font-size: 28px;
+  }
+
+  .success-message {
+    position: static;
+    margin-top: 16px;
+    align-self: flex-start;
+  }
+
+  .setting-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px 20px;
+  }
+
+  .setting-info {
+    margin-right: 0;
+  }
+
+  .setting-control {
+    align-self: stretch;
+    justify-content: flex-end;
+  }
+
+  .number-input, .text-input {
+    width: 100px;
+  }
+
+  .select-input {
+    width: 140px;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .save-btn, .reset-btn {
+    width: 100%;
+    min-width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .rack-settings {
+    padding: 12px;
+  }
+
+  .settings-header {
+    padding: 16px;
+  }
+
+  .header-content h1 {
+    font-size: 24px;
+  }
+
+  .setting-item {
+    padding: 12px 16px;
+  }
+
+  .settings-section h2 {
+    padding: 16px 20px;
+    font-size: 18px;
+  }
+
+  .settings-actions {
+    padding: 20px;
+  }
+}

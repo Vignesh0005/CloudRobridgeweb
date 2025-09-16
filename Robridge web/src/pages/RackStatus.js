@@ -17,93 +17,54 @@ import {
 import './RackStatus.css';
 
 const RackStatus = () => {
-  const [racks, setRacks] = useState([
-    {
-      id: 1,
-      name: 'Rack A-01',
-      location: 'Warehouse Section 1',
-      coordinates: { x: 10, y: 15 },
-      status: 'occupied',
-      occupiedBy: 'Robot-001',
-      lastUpdated: '2024-01-15 14:30:25',
-      capacity: 100,
-      currentLoad: 85,
-      temperature: 22.5,
-      humidity: 45
-    },
-    {
-      id: 2,
-      name: 'Rack A-02',
-      location: 'Warehouse Section 1',
-      coordinates: { x: 25, y: 15 },
-      status: 'free',
-      occupiedBy: null,
-      lastUpdated: '2024-01-15 14:28:10',
-      capacity: 100,
-      currentLoad: 0,
-      temperature: 21.8,
-      humidity: 42
-    },
-    {
-      id: 3,
-      name: 'Rack B-01',
-      location: 'Warehouse Section 2',
-      coordinates: { x: 10, y: 35 },
-      status: 'maintenance',
-      occupiedBy: null,
-      lastUpdated: '2024-01-15 14:25:45',
-      capacity: 100,
-      currentLoad: 0,
-      temperature: 23.1,
-      humidity: 48
-    },
-    {
-      id: 4,
-      name: 'Rack B-02',
-      location: 'Warehouse Section 2',
-      coordinates: { x: 25, y: 35 },
-      status: 'occupied',
-      occupiedBy: 'Robot-003',
-      lastUpdated: '2024-01-15 14:32:15',
-      capacity: 100,
-      currentLoad: 92,
-      temperature: 22.3,
-      humidity: 44
-    },
-    {
-      id: 5,
-      name: 'Rack C-01',
-      location: 'Warehouse Section 3',
-      coordinates: { x: 10, y: 55 },
-      status: 'free',
-      occupiedBy: null,
-      lastUpdated: '2024-01-15 14:29:30',
-      capacity: 100,
-      currentLoad: 0,
-      temperature: 21.5,
-      humidity: 41
-    },
-    {
-      id: 6,
-      name: 'Rack C-02',
-      location: 'Warehouse Section 3',
-      coordinates: { x: 25, y: 55 },
-      status: 'occupied',
-      occupiedBy: 'Robot-002',
-      lastUpdated: '2024-01-15 14:31:20',
-      capacity: 100,
-      currentLoad: 78,
-      temperature: 22.8,
-      humidity: 46
-    }
-  ]);
+  const [racks, setRacks] = useState([]);
 
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRack, setSelectedRack] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    total: 0,
+    occupied: 0,
+    free: 0,
+    maintenance: 0,
+    utilization: 0
+  });
 
-  // Simulate real-time updates
+  // Load rack status data from database
+  const loadRackStatus = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('http://localhost:3001/api/rack-status');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setRacks(data.racks);
+        setStats(data.stats);
+      } else {
+        console.error('Failed to load rack status:', data.error);
+        alert('Failed to load rack status: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error loading rack status:', error);
+      alert('Error loading rack status: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load data on component mount
+  useEffect(() => {
+    loadRackStatus();
+  }, []);
+
+  // Simulate real-time updates (update environmental data)
   useEffect(() => {
     const interval = setInterval(() => {
       setRacks(prevRacks => 
@@ -168,15 +129,9 @@ const RackStatus = () => {
 
   const refreshData = () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setRacks(prevRacks => 
-        prevRacks.map(rack => ({
-          ...rack,
-          lastUpdated: new Date().toLocaleString()
-        }))
-      );
+    loadRackStatus().finally(() => {
       setIsRefreshing(false);
-    }, 1000);
+    });
   };
 
   const exportData = () => {
@@ -204,13 +159,7 @@ const RackStatus = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const stats = {
-    total: racks.length,
-    occupied: racks.filter(r => r.status === 'occupied').length,
-    free: racks.filter(r => r.status === 'free').length,
-    maintenance: racks.filter(r => r.status === 'maintenance').length,
-    utilization: Math.round((racks.filter(r => r.status === 'occupied').length / racks.length) * 100)
-  };
+  // Stats are now loaded from the database
 
   return (
     <div className="rack-status-container">
@@ -306,7 +255,21 @@ const RackStatus = () => {
       </div>
 
       <div className="racks-grid">
-        {filteredRacks.map(rack => (
+        {isLoading ? (
+          <div className="loading-state">
+            <div className="loading-spinner">
+              <div className="spinner"></div>
+              <p>Loading rack status...</p>
+            </div>
+          </div>
+        ) : filteredRacks.length === 0 ? (
+          <div className="empty-state">
+            <FaWarehouse className="empty-icon" />
+            <h3>No racks found</h3>
+            <p>No racks match your current search or filter criteria.</p>
+          </div>
+        ) : (
+          filteredRacks.map(rack => (
           <div 
             key={rack.id} 
             className={`rack-card ${rack.status} ${selectedRack?.id === rack.id ? 'selected' : ''}`}
@@ -359,7 +322,8 @@ const RackStatus = () => {
               </div>
             </div>
           </div>
-        ))}
+          ))
+        )}
       </div>
 
       {selectedRack && (

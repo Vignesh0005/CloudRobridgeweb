@@ -6,6 +6,10 @@ const cors = require('cors');
 const app = express();
 const PORT = 3001;
 
+// Create a separate app for port 3000 redirect
+const redirectApp = express();
+const REDIRECT_PORT = 3000;
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -214,6 +218,218 @@ app.get('/api/list_barcodes', async (req, res) => {
   }
 });
 
+// Rack Management API endpoints
+app.get('/api/racks', async (req, res) => {
+  try {
+    const isBackendRunning = await checkPythonBackend();
+    if (!isBackendRunning) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Python backend is not running on port 5000' 
+      });
+    }
+
+    // Forward request to Python backend
+    const url = new URL('http://localhost:5000/api/racks');
+    if (req.query.search) url.searchParams.append('search', req.query.search);
+    if (req.query.status) url.searchParams.append('status', req.query.status);
+    
+    const response = await fetch(url.toString());
+    const result = await response.json();
+    res.json(result);
+  } catch (error) {
+    console.error('Error proxying to Python backend:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to communicate with Python backend' 
+    });
+  }
+});
+
+app.post('/api/racks', async (req, res) => {
+  try {
+    const isBackendRunning = await checkPythonBackend();
+    if (!isBackendRunning) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Python backend is not running on port 5000' 
+      });
+    }
+
+    // Forward request to Python backend
+    const response = await fetch('http://localhost:5000/api/racks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(req.body)
+    });
+
+    const result = await response.json();
+    res.status(response.status).json(result);
+  } catch (error) {
+    console.error('Error proxying to Python backend:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to communicate with Python backend' 
+    });
+  }
+});
+
+app.put('/api/racks/:id', async (req, res) => {
+  try {
+    const isBackendRunning = await checkPythonBackend();
+    if (!isBackendRunning) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Python backend is not running on port 5000' 
+      });
+    }
+
+    // Forward request to Python backend
+    const response = await fetch(`http://localhost:5000/api/racks/${req.params.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(req.body)
+    });
+
+    const result = await response.json();
+    res.status(response.status).json(result);
+  } catch (error) {
+    console.error('Error proxying to Python backend:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to communicate with Python backend' 
+    });
+  }
+});
+
+app.delete('/api/racks/:id', async (req, res) => {
+  try {
+    const isBackendRunning = await checkPythonBackend();
+    if (!isBackendRunning) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Python backend is not running on port 5000' 
+      });
+    }
+
+    // Forward request to Python backend
+    const response = await fetch(`http://localhost:5000/api/racks/${req.params.id}`, {
+      method: 'DELETE'
+    });
+
+    const result = await response.json();
+    res.status(response.status).json(result);
+  } catch (error) {
+    console.error('Error proxying to Python backend:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to communicate with Python backend' 
+    });
+  }
+});
+
+app.get('/api/racks/stats', async (req, res) => {
+  try {
+    const isBackendRunning = await checkPythonBackend();
+    if (!isBackendRunning) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Python backend is not running on port 5000' 
+      });
+    }
+
+    // Forward request to Python backend
+    const response = await fetch('http://localhost:5000/api/racks/stats');
+    const result = await response.json();
+    res.json(result);
+  } catch (error) {
+    console.error('Error proxying to Python backend:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to communicate with Python backend' 
+    });
+  }
+});
+
+app.get('/api/racks/search', async (req, res) => {
+  try {
+    const isBackendRunning = await checkPythonBackend();
+    if (!isBackendRunning) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Python backend is not running on port 5000' 
+      });
+    }
+
+    // Forward request to Python backend
+    const url = new URL('http://localhost:5000/api/racks/search');
+    if (req.query.q) url.searchParams.append('q', req.query.q);
+    
+    const response = await fetch(url.toString());
+    const result = await response.json();
+    res.json(result);
+  } catch (error) {
+    console.error('Error proxying to Python backend:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to communicate with Python backend' 
+    });
+  }
+});
+
+// Proxy for rack status (operational monitoring)
+app.get('/api/rack-status', async (req, res) => {
+  try {
+    const isBackendRunning = await checkPythonBackend();
+    if (!isBackendRunning) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Python backend is not running on port 5000' 
+      });
+    }
+
+    // Forward request to Python backend
+    const response = await fetch('http://localhost:5000/api/rack-status');
+    const result = await response.json();
+    res.json(result);
+  } catch (error) {
+    console.error('Error proxying rack status to Python backend:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to communicate with Python backend' 
+    });
+  }
+});
+
+app.post('/api/init-db', async (req, res) => {
+  try {
+    const isBackendRunning = await checkPythonBackend();
+    if (!isBackendRunning) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Python backend is not running on port 5000' 
+      });
+    }
+
+    // Forward request to Python backend
+    const response = await fetch('http://localhost:5000/api/init-db', {
+      method: 'POST'
+    });
+    const result = await response.json();
+    res.json(result);
+  } catch (error) {
+    console.error('Error proxying to Python backend:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to communicate with Python backend' 
+    });
+  }
+});
+
 // Serve React app for all other routes (only if build exists)
 app.get('*', (req, res) => {
   const buildPath = path.join(__dirname, 'build', 'index.html');
@@ -232,7 +448,24 @@ app.get('*', (req, res) => {
   }
 });
 
+// Redirect app setup for port 3000
+redirectApp.get('*', (req, res) => {
+  const redirectUrl = `http://localhost:${PORT}${req.originalUrl}`;
+  console.log(`Redirecting from port ${REDIRECT_PORT} to port ${PORT}: ${redirectUrl}`);
+  res.redirect(301, redirectUrl);
+});
+
+// Start both servers
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Main server running on port ${PORT}`);
   console.log(`Python backend control available at http://localhost:${PORT}/api/`);
+  console.log(`Access the app at: http://localhost:${PORT}`);
+});
+
+redirectApp.listen(REDIRECT_PORT, () => {
+  console.log(`Redirect server running on port ${REDIRECT_PORT}`);
+  console.log(`Redirecting all traffic to port ${PORT}`);
+  console.log(`You can access the app at either:`);
+  console.log(`  - http://localhost:${PORT} (recommended)`);
+  console.log(`  - http://localhost:${REDIRECT_PORT} (redirects to ${PORT})`);
 });

@@ -80,10 +80,10 @@ const LoginPage = () => {
       
       <div className="login-center">
         <div className="top-left-logo">
-          <img src="/Robridge-logo.png" alt="RobBridge Logo" className="logo-image" />
+          <img src="/logo.png" alt="RobBridge Logo" className="logo-image" />
         </div>
         <div className="login-header">
-          <h1 className="login-title">Welcome to RobBridge</h1>
+          <h1 className="login-title">Welcome</h1>
           <p className="login-subtitle">Robot Control and Barcode Management System</p>
         </div>
 

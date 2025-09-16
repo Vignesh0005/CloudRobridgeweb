@@ -6,7 +6,9 @@ import {
   FaImage, 
   FaRobot,
   FaDatabase,
-  FaChartLine
+  FaChartLine,
+  FaWarehouse,
+  FaBox
 } from 'react-icons/fa';
 import './Dashboard.css';
 
@@ -41,6 +43,20 @@ const Dashboard = () => {
       color: '#E3821E'
     },
     { 
+      title: 'Rack Management', 
+      description: 'Manage warehouse racks and products',
+      icon: FaWarehouse, 
+      path: '/rack-management',
+      color: '#E3821E'
+    },
+    { 
+      title: 'Product Management', 
+      description: 'Track product movements and inventory',
+      icon: FaBox, 
+      path: '/product-management',
+      color: '#E3821E'
+    },
+    { 
       title: '2D Map', 
       description: 'Real-time LiDAR mapping and robot tracking',
       icon: FaRobot, 
@@ -59,8 +75,13 @@ const Dashboard = () => {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <h1>Dashboard</h1>
-        <p>Welcome to RobBridge UI - Robot Control and Barcode Management System</p>
+        <div className="dashboard-brand">
+          <img src="/logo.png" alt="RobBridge Logo" className="dashboard-logo" />
+          <div className="dashboard-title">
+            <h1>Dashboard</h1>
+            <p>Robot Control and Barcode Management System</p>
+          </div>
+        </div>
       </div>
 
       {/* Stats Cards */}

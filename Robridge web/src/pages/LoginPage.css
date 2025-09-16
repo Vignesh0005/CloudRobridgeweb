@@ -47,7 +47,7 @@
 }
 
 .logo-image {
-  width: 400px;
+  width: 800px;
   height: auto;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
   transition: transform 0.3s ease;
@@ -88,7 +88,7 @@
 
 
 .login-title {
-  font-size: 32px;
+  font-size: 48px;
   font-weight: 700;
   color: #ffffff;
   margin: 16px 0 12px 0;
@@ -97,7 +97,7 @@
 }
 
 .login-subtitle {
-  font-size: 18px;
+  font-size: 24px;
   color: #b0b0b0;
   margin: 0;
   font-weight: 400;
@@ -426,7 +426,7 @@
   }
   
   .logo-image {
-    width: 300px;
+    width: 600px;
   }
   
   .login-center {
@@ -434,11 +434,11 @@
   }
   
   .login-title {
-    font-size: 28px;
+    font-size: 40px;
   }
   
   .login-subtitle {
-    font-size: 14px;
+    font-size: 18px;
   }
   
   
@@ -459,7 +459,7 @@
   }
   
   .logo-image {
-    width: 250px;
+    width: 500px;
   }
   
   .login-center {
@@ -472,7 +472,11 @@
   }
   
   .login-title {
-    font-size: 24px;
+    font-size: 32px;
+  }
+  
+  .login-subtitle {
+    font-size: 16px;
   }
   
   

@@ -15,10 +15,11 @@ CORS(app)
 
 # Database setup
 def init_database():
-    """Initialize SQLite database with barcode table"""
+    """Initialize SQLite database with barcode and racks tables"""
     conn = sqlite3.connect('barcodes.db')
     cursor = conn.cursor()
     
+    # Create barcodes table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS barcodes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,6 +37,19 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             file_path TEXT,
             metadata TEXT
+        )
+    ''')
+    
+    # Create racks table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS racks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rack_name TEXT UNIQUE NOT NULL,
+            product_name TEXT NOT NULL,
+            product_id TEXT NOT NULL,
+            status TEXT DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
@@ -274,11 +288,14 @@ def generate_barcode():
         save_barcode_to_db(barcode_id, barcode_data, barcode_type, source, final_filename, metadata)
         print(f"DEBUG: Saved to database successfully")
         
+        # Return just the filename without the path for the frontend
+        filename_only = os.path.basename(final_filename)
+        
         return jsonify({
             'success': True,
             'message': f'{barcode_type.upper()} barcode generated successfully',
             'barcode_id': barcode_id,
-            'filename': final_filename,
+            'filename': filename_only,
             'data': barcode_data,
             'type': barcode_type,
             'source': source
@@ -439,6 +456,375 @@ def get_barcode_data(barcode_id):
         print(f"ERROR: Exception in get_barcode_data: {e}")
         return jsonify({'error': str(e)}), 500
 
+# Rack Management API Endpoints
+@app.route('/api/racks', methods=['GET'])
+def get_racks():
+    """Get all racks with optional search and filter"""
+    try:
+        conn = sqlite3.connect('barcodes.db')
+        cursor = conn.cursor()
+        
+        # Get query parameters
+        search = request.args.get('search', '')
+        status = request.args.get('status', 'all')
+        
+        # Build query
+        query = '''
+            SELECT id, rack_name, product_name, product_id, status, created_at, updated_at
+            FROM racks
+        '''
+        params = []
+        conditions = []
+        
+        if search:
+            conditions.append('(rack_name LIKE ? OR product_name LIKE ? OR product_id LIKE ?)')
+            search_term = f'%{search}%'
+            params.extend([search_term, search_term, search_term])
+        
+        if status != 'all':
+            conditions.append('status = ?')
+            params.append(status)
+        
+        if conditions:
+            query += ' WHERE ' + ' AND '.join(conditions)
+        
+        query += ' ORDER BY created_at DESC'
+        
+        cursor.execute(query, params)
+        racks = []
+        for row in cursor.fetchall():
+            racks.append({
+                'id': row[0],
+                'rackName': row[1],
+                'productName': row[2],
+                'productId': row[3],
+                'status': row[4],
+                'createdAt': row[5],
+                'updatedAt': row[6]
+            })
+        
+        conn.close()
+        return jsonify({'success': True, 'racks': racks})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/racks', methods=['POST'])
+def create_rack():
+    """Create a new rack"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if not data.get('rackName') or not data.get('productName') or not data.get('productId'):
+            return jsonify({'success': False, 'error': 'Rack name, product name, and product ID are required'}), 400
+        
+        conn = sqlite3.connect('barcodes.db')
+        cursor = conn.cursor()
+        
+        # Check if rack name already exists
+        cursor.execute('SELECT id FROM racks WHERE rack_name = ?', (data['rackName'],))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({'success': False, 'error': 'Rack name already exists'}), 400
+        
+        # Insert new rack
+        cursor.execute('''
+            INSERT INTO racks (rack_name, product_name, product_id, status)
+            VALUES (?, ?, ?, ?)
+        ''', (
+            data['rackName'],
+            data['productName'],
+            data['productId'],
+            data.get('status', 'active')
+        ))
+        
+        rack_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Rack created successfully',
+            'rack': {
+                'id': rack_id,
+                'rackName': data['rackName'],
+                'productName': data['productName'],
+                'productId': data['productId'],
+                'status': data.get('status', 'active')
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/racks/<int:rack_id>', methods=['PUT'])
+def update_rack(rack_id):
+    """Update an existing rack"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if not data.get('rackName') or not data.get('productName') or not data.get('productId'):
+            return jsonify({'success': False, 'error': 'Rack name, product name, and product ID are required'}), 400
+        
+        conn = sqlite3.connect('barcodes.db')
+        cursor = conn.cursor()
+        
+        # Check if rack exists
+        cursor.execute('SELECT id FROM racks WHERE id = ?', (rack_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({'success': False, 'error': 'Rack not found'}), 404
+        
+        # Check if rack name already exists (excluding current rack)
+        cursor.execute('SELECT id FROM racks WHERE rack_name = ? AND id != ?', (data['rackName'], rack_id))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({'success': False, 'error': 'Rack name already exists'}), 400
+        
+        # Update rack
+        cursor.execute('''
+            UPDATE racks 
+            SET rack_name = ?, product_name = ?, product_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (
+            data['rackName'],
+            data['productName'],
+            data['productId'],
+            data.get('status', 'active'),
+            rack_id
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Rack updated successfully',
+            'rack': {
+                'id': rack_id,
+                'rackName': data['rackName'],
+                'productName': data['productName'],
+                'productId': data['productId'],
+                'status': data.get('status', 'active')
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/racks/<int:rack_id>', methods=['DELETE'])
+def delete_rack(rack_id):
+    """Delete a rack"""
+    try:
+        conn = sqlite3.connect('barcodes.db')
+        cursor = conn.cursor()
+        
+        # Check if rack exists
+        cursor.execute('SELECT id FROM racks WHERE id = ?', (rack_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({'success': False, 'error': 'Rack not found'}), 404
+        
+        # Delete rack
+        cursor.execute('DELETE FROM racks WHERE id = ?', (rack_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': 'Rack deleted successfully'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/racks/stats', methods=['GET'])
+def get_rack_stats():
+    """Get rack statistics"""
+    try:
+        conn = sqlite3.connect('barcodes.db')
+        cursor = conn.cursor()
+        
+        # Get total racks
+        cursor.execute('SELECT COUNT(*) FROM racks')
+        total_racks = cursor.fetchone()[0]
+        
+        # Get active racks
+        cursor.execute('SELECT COUNT(*) FROM racks WHERE status = "active"')
+        active_racks = cursor.fetchone()[0]
+        
+        # Get inactive racks
+        cursor.execute('SELECT COUNT(*) FROM racks WHERE status = "inactive"')
+        inactive_racks = cursor.fetchone()[0]
+        
+        # Get unique products
+        cursor.execute('SELECT COUNT(DISTINCT product_id) FROM racks')
+        unique_products = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'stats': {
+                'totalRacks': total_racks,
+                'activeRacks': active_racks,
+                'inactiveRacks': inactive_racks,
+                'uniqueProducts': unique_products
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/racks/search', methods=['GET'])
+def search_racks():
+    """Search racks by rack ID or rack name"""
+    try:
+        query = request.args.get('q', '').strip()
+        
+        if not query:
+            return jsonify({'success': False, 'error': 'Search query is required'}), 400
+        
+        conn = sqlite3.connect('barcodes.db')
+        cursor = conn.cursor()
+        
+        # Search by rack ID (exact match) or rack name (partial match)
+        cursor.execute('''
+            SELECT id, rack_name, product_name, product_id, status, created_at, updated_at
+            FROM racks
+            WHERE id = ? OR rack_name LIKE ?
+            ORDER BY 
+                CASE 
+                    WHEN id = ? THEN 1
+                    WHEN rack_name = ? THEN 2
+                    ELSE 3
+                END,
+                created_at DESC
+        ''', (query, f'%{query}%', query, query))
+        
+        racks = []
+        for row in cursor.fetchall():
+            racks.append({
+                'id': row[0],
+                'rackName': row[1],
+                'productName': row[2],
+                'productId': row[3],
+                'status': row[4],
+                'createdAt': row[5],
+                'updatedAt': row[6]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'racks': racks,
+            'query': query,
+            'count': len(racks)
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rack-status', methods=['GET'])
+def get_rack_status():
+    """Get rack status for operational monitoring"""
+    try:
+        conn = sqlite3.connect('barcodes.db')
+        cursor = conn.cursor()
+        
+        # Get all racks with their operational status
+        cursor.execute('''
+            SELECT 
+                id,
+                rack_name,
+                product_name,
+                product_id,
+                status,
+                created_at,
+                updated_at
+            FROM racks 
+            ORDER BY rack_name
+        ''')
+        
+        racks = []
+        for row in cursor.fetchall():
+            # Determine operational status based on management data
+            operational_status = 'free'  # Default
+            occupied_by = None
+            
+            if row[4] == 'active':  # If rack is active in management
+                if row[2] and row[2].strip():  # If product is assigned
+                    operational_status = 'occupied'
+                    occupied_by = f"Product-{row[3]}"  # Use product ID as identifier
+                else:
+                    operational_status = 'free'
+            else:  # If rack is inactive in management
+                operational_status = 'maintenance'
+            
+            # Generate mock environmental data (in real system, this would come from sensors)
+            import random
+            base_temp = 22.0
+            base_humidity = 45
+            
+            rack_data = {
+                'id': row[0],
+                'name': row[1],
+                'location': f'Warehouse Section {chr(65 + (row[0] - 1) // 2)}',  # A, B, C sections
+                'coordinates': {
+                    'x': 10 + ((row[0] - 1) % 2) * 15,  # Alternate positions
+                    'y': 15 + ((row[0] - 1) // 2) * 20   # Row spacing
+                },
+                'status': operational_status,
+                'occupiedBy': occupied_by,
+                'lastUpdated': row[6] or row[5],  # Use updated_at or created_at
+                'capacity': 100,
+                'currentLoad': 85 if operational_status == 'occupied' else 0,
+                'temperature': round(base_temp + random.uniform(-2, 2), 1),
+                'humidity': round(base_humidity + random.uniform(-5, 5)),
+                'productName': row[2] if row[2] else 'No Product',
+                'productId': row[3] if row[3] else 'N/A'
+            }
+            racks.append(rack_data)
+        
+        conn.close()
+        
+        # Calculate statistics
+        total_racks = len(racks)
+        occupied_racks = len([r for r in racks if r['status'] == 'occupied'])
+        free_racks = len([r for r in racks if r['status'] == 'free'])
+        maintenance_racks = len([r for r in racks if r['status'] == 'maintenance'])
+        utilization = round((occupied_racks / total_racks * 100) if total_racks > 0 else 0)
+        
+        return jsonify({
+            'success': True,
+            'racks': racks,
+            'stats': {
+                'total': total_racks,
+                'occupied': occupied_racks,
+                'free': free_racks,
+                'maintenance': maintenance_racks,
+                'utilization': utilization
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/init-db', methods=['POST'])
+def init_database_endpoint():
+    """Initialize database endpoint"""
+    try:
+        init_database()
+        return jsonify({
+            'success': True,
+            'message': 'Database initialized successfully'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/health')
 def health_check():
     """Health check endpoint"""
@@ -446,7 +832,9 @@ def health_check():
 
 if __name__ == '__main__':
     # Initialize database
+    print("Initializing database...")
     init_database()
+    print("Database initialized successfully!")
     
     print("Barcode Generator Server Starting...")
     print("Available endpoints:")
@@ -455,6 +843,9 @@ if __name__ == '__main__':
     print("- GET /get_barcode_by_id/<barcode_id> - Get barcode details by ID")
     print("- GET /get_barcode_data/<barcode_id> - Get structured barcode data")
     print("- GET /list_barcodes - List all barcodes")
+    print("- GET /api/racks - Rack management endpoints")
+    print("- GET /api/racks/stats - Rack statistics")
+    print("- GET /api/racks/search - Search racks")
     print("- GET /health - Health check")
     
     app.run(debug=True, host='0.0.0.0', port=5000)

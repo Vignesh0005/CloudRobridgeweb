@@ -17,18 +17,18 @@
   border-bottom: 1px solid #E3821E;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
 }
 
 .nav-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
 }
 
 .logo-image {
-  width: 40px;
-  height: 40px;
+  width: 70px;
+  height: 70px;
   object-fit: contain;
 }
 

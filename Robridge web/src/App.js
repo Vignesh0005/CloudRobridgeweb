@@ -9,6 +9,9 @@ import BarcodeGenerator from './pages/BarcodeGenerator';
 import ImageProcessing from './pages/ImageProcessing';
 import RobotControl from './pages/RobotControl';
 import RackStatus from './pages/RackStatus';
+import RackManagement from './pages/RackManagement';
+import ProductManagement from './pages/ProductManagement';
+import RackSettings from './pages/RackSettings';
 import DeviceConnected from './pages/DeviceConnected';
 import Settings from './pages/Settings';
 import './App.css';
@@ -46,6 +49,9 @@ function AppContent() {
           <Route path="/image-processing" element={<ImageProcessing />} />
           <Route path="/robot-control" element={<RobotControl />} />
           <Route path="/rack-status" element={<RackStatus />} />
+          <Route path="/rack-management" element={<RackManagement />} />
+          <Route path="/product-management" element={<ProductManagement />} />
+          <Route path="/rack-settings" element={<RackSettings />} />
           <Route path="/device-connected" element={<DeviceConnected />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

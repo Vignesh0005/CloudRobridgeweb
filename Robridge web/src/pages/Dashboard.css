@@ -4,20 +4,42 @@
 }
 
 .dashboard-header {
-  text-align: center;
   margin-bottom: 32px;
 }
 
-.dashboard-header h1 {
+.dashboard-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-logo {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.dashboard-title {
+  text-align: left;
+}
+
+.dashboard-title h1 {
   color: #3D3E41;
   font-size: 32px;
   font-weight: 700;
-  margin-bottom: 8px;
+  margin: 0 0 8px 0;
 }
 
-.dashboard-header p {
-  color: #3D3E41;
+.dashboard-title p {
+  color: #666;
   font-size: 16px;
+  margin: 0;
 }
 
 /* Stats Grid */
@@ -245,8 +267,23 @@
     grid-template-columns: 1fr;
   }
   
-  .dashboard-header h1 {
+  .dashboard-brand {
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+  }
+
+  .dashboard-title {
+    text-align: center;
+  }
+
+  .dashboard-title h1 {
     font-size: 24px;
+  }
+
+  .dashboard-logo {
+    width: 70px;
+    height: 70px;
   }
   
   .stat-card {
