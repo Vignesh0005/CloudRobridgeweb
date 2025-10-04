@@ -38,6 +38,26 @@
   height: 30px;
 }
 
+/* Expo User Logo - Larger Size */
+.expo-logo-image {
+  width: 120px !important;
+  height: 120px !important;
+  object-fit: contain;
+  transition: all 0.3s ease;
+}
+
+.navigation.collapsed .expo-logo-image {
+  width: 50px !important;
+  height: 50px !important;
+}
+
+.expo-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+
 .navigation.collapsed .nav-header {
   padding: 16px 10px;
   flex-direction: column;
@@ -237,6 +257,17 @@
 
   .navigation.collapsed {
     width: 280px;
+  }
+
+  /* Adjust Expo logo for mobile */
+  .expo-logo-image {
+    width: 100px !important;
+    height: 100px !important;
+  }
+
+  .navigation.collapsed .expo-logo-image {
+    width: 40px !important;
+    height: 40px !important;
   }
 }
 

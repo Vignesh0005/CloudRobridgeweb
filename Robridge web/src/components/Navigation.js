@@ -67,8 +67,8 @@ const Navigation = () => {
   return (
     <nav className={`navigation ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="nav-header">
-        <div className="nav-logo">
-          <img src="/logo.png" alt="RobBridge Logo" className="logo-image" />
+        <div className={`nav-logo ${userRole === ROLES.EXPO_USER ? 'expo-logo' : ''}`}>
+          <img src="/logo.png" alt="RobBridge Logo" className={`logo-image ${userRole === ROLES.EXPO_USER ? 'expo-logo-image' : ''}`} />
         </div>
         <button className="nav-toggle" onClick={toggleCollapse}>
           {isCollapsed ? <FaBars /> : <FaTimes />}
