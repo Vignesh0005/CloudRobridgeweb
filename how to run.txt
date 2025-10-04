@@ -1,8 +1,16 @@
 cd Barcode generator&Scanner 
 Python install -r requirements.txt 
+python start_server.py
 
 cd Robridge web
 npm install
 npm start 
 
+cd Robridge web
 node server.js
+
+default runing on localhost 3000
+
+All done check if backend is runnign &also websocket for esp32 
+
+

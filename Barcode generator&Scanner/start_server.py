@@ -52,6 +52,7 @@ def start_server():
     print("   - GET /get_barcode_by_id/<barcode_id> - Get barcode details by ID")
     print("   - GET /get_barcode_data/<barcode_id> - Get structured barcode data")
     print("   - GET /list_barcodes - List all barcodes")
+    print("   - POST /api/lookup_barcode - Look up barcode in database")
     print("   - GET /health - Health check")
     print("\n[INFO] Keep this terminal open while using the React app")
     print("[INFO] Press Ctrl+C to stop the server")

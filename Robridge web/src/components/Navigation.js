@@ -14,30 +14,45 @@ import {
   FaBars,
   FaTimes,
   FaSignOutAlt,
-  FaUser
+  FaUser,
+  FaShieldAlt,
+  FaCrown
 } from 'react-icons/fa';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, ROLES } from '../contexts/AuthContext';
 import './Navigation.css';
 
 const Navigation = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { logout, getUserInfo } = useAuth();
+  const { logout, getUserInfo, hasPageAccess, getUserRole } = useAuth();
   const user = getUserInfo();
+  const userRole = getUserRole();
 
-
-  const navItems = [
-    { path: '/', icon: FaHome, label: 'Dashboard' },
-    { path: '/scanner', icon: FaBarcode, label: 'Barcode Scanner' },
-    { path: '/generator', icon: FaQrcode, label: 'Barcode Generator' },
-    { path: '/image-processing', icon: FaImage, label: 'Image Processing' },
-    { path: '/robot-control', icon: FaRobot, label: 'Robot Status' },
-    { path: '/rack-status', icon: FaWarehouse, label: 'Rack Status' },
-    { path: '/rack-management', icon: FaWarehouse, label: 'Rack Management' },
-    { path: '/product-management', icon: FaBox, label: 'Product Management' },
-    { path: '/rack-settings', icon: FaCogs, label: 'Rack Settings' },
-    { path: '/device-connected', icon: FaWifi, label: 'Device Connected' },
-    { path: '/settings', icon: FaCog, label: 'Settings' }
+  // All available navigation items
+  const allNavItems = [
+    { path: '/', icon: FaHome, label: 'Dashboard', roles: [ROLES.ADMIN, ROLES.EXPO_USER, ROLES.FULL_ACCESS] },
+    { path: '/scanner', icon: FaBarcode, label: 'Barcode Scanner', roles: [ROLES.ADMIN, ROLES.EXPO_USER, ROLES.FULL_ACCESS] },
+    { path: '/generator', icon: FaQrcode, label: 'Barcode Generator', roles: [ROLES.ADMIN, ROLES.FULL_ACCESS] },
+    { path: '/image-processing', icon: FaImage, label: 'Image Processing', roles: [ROLES.ADMIN, ROLES.FULL_ACCESS] },
+    { path: '/robot-control', icon: FaRobot, label: 'Robot Status', roles: [ROLES.ADMIN, ROLES.FULL_ACCESS] },
+    { path: '/rack-status', icon: FaWarehouse, label: 'Rack Status', roles: [ROLES.ADMIN, ROLES.FULL_ACCESS] },
+    { path: '/rack-management', icon: FaWarehouse, label: 'Rack Management', roles: [ROLES.ADMIN, ROLES.FULL_ACCESS] },
+    { path: '/product-management', icon: FaBox, label: 'Product Management', roles: [ROLES.ADMIN, ROLES.FULL_ACCESS] },
+    { path: '/device-connected', icon: FaWifi, label: 'Device Connected', roles: [ROLES.ADMIN, ROLES.EXPO_USER, ROLES.FULL_ACCESS] },
+    { path: '/settings', icon: FaCog, label: 'Settings', roles: [ROLES.ADMIN, ROLES.FULL_ACCESS] }
   ];
+
+  // Filter navigation items based on user role and page access
+  const navItems = allNavItems.filter(item => {
+    if (!user || !userRole) return false;
+    
+    // Check if user's role is in the item's allowed roles
+    const hasRoleAccess = item.roles.includes(userRole);
+    
+    // Also check page access for additional security
+    const hasPageAccessCheck = hasPageAccess(item.path);
+    
+    return hasRoleAccess && hasPageAccessCheck;
+  });
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed);
@@ -84,11 +99,18 @@ const Navigation = () => {
         {!isCollapsed && user && (
           <div className="user-info">
             <div className="user-avatar">
-              <FaUser />
+              {userRole === ROLES.EXPO_USER && <FaUser />}
+              {userRole === ROLES.ADMIN && <FaShieldAlt />}
+              {userRole === ROLES.FULL_ACCESS && <FaCrown />}
             </div>
             <div className="user-details">
               <div className="user-name">{user.name}</div>
               <div className="user-email">{user.email}</div>
+              <div className="user-role">
+                {userRole === ROLES.EXPO_USER && 'Expo User'}
+                {userRole === ROLES.ADMIN && 'Administrator'}
+                {userRole === ROLES.FULL_ACCESS && 'Full Access'}
+              </div>
             </div>
           </div>
         )}

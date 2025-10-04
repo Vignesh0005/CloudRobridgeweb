@@ -47,11 +47,19 @@ def init_database():
             rack_name TEXT UNIQUE NOT NULL,
             product_name TEXT NOT NULL,
             product_id TEXT NOT NULL,
-            status TEXT DEFAULT 'active',
+            quantity INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # Add quantity column to existing racks table if it doesn't exist
+    try:
+        cursor.execute('ALTER TABLE racks ADD COLUMN quantity INTEGER DEFAULT 0')
+        print("Added quantity column to existing racks table")
+    except sqlite3.OperationalError:
+        # Column already exists, ignore the error
+        pass
     
     conn.commit()
     conn.close()
@@ -470,7 +478,7 @@ def get_racks():
         
         # Build query
         query = '''
-            SELECT id, rack_name, product_name, product_id, status, created_at, updated_at
+            SELECT id, rack_name, product_name, product_id, quantity, created_at, updated_at
             FROM racks
         '''
         params = []
@@ -481,9 +489,7 @@ def get_racks():
             search_term = f'%{search}%'
             params.extend([search_term, search_term, search_term])
         
-        if status != 'all':
-            conditions.append('status = ?')
-            params.append(status)
+        # Remove status filtering since we removed status column
         
         if conditions:
             query += ' WHERE ' + ' AND '.join(conditions)
@@ -498,7 +504,7 @@ def get_racks():
                 'rackName': row[1],
                 'productName': row[2],
                 'productId': row[3],
-                'status': row[4],
+                'quantity': row[4],
                 'createdAt': row[5],
                 'updatedAt': row[6]
             })
@@ -530,13 +536,13 @@ def create_rack():
         
         # Insert new rack
         cursor.execute('''
-            INSERT INTO racks (rack_name, product_name, product_id, status)
+            INSERT INTO racks (rack_name, product_name, product_id, quantity)
             VALUES (?, ?, ?, ?)
         ''', (
             data['rackName'],
             data['productName'],
             data['productId'],
-            data.get('status', 'active')
+            data.get('quantity', 0)
         ))
         
         rack_id = cursor.lastrowid
@@ -551,7 +557,7 @@ def create_rack():
                 'rackName': data['rackName'],
                 'productName': data['productName'],
                 'productId': data['productId'],
-                'status': data.get('status', 'active')
+                'quantity': data.get('quantity', 0)
             }
         })
         
@@ -586,13 +592,13 @@ def update_rack(rack_id):
         # Update rack
         cursor.execute('''
             UPDATE racks 
-            SET rack_name = ?, product_name = ?, product_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+            SET rack_name = ?, product_name = ?, product_id = ?, quantity = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ''', (
             data['rackName'],
             data['productName'],
             data['productId'],
-            data.get('status', 'active'),
+            data.get('quantity', 0),
             rack_id
         ))
         
@@ -607,7 +613,7 @@ def update_rack(rack_id):
                 'rackName': data['rackName'],
                 'productName': data['productName'],
                 'productId': data['productId'],
-                'status': data.get('status', 'active')
+                'quantity': data.get('quantity', 0)
             }
         })
         
@@ -810,6 +816,60 @@ def get_rack_status():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/racks/<int:rack_id>/update-quantity', methods=['POST'])
+def update_rack_quantity(rack_id):
+    """Update rack quantity based on product movement"""
+    try:
+        data = request.get_json()
+        movement_type = data.get('type')  # 'inbound' or 'outbound'
+        quantity_change = data.get('quantity', 0)
+        
+        if movement_type not in ['inbound', 'outbound']:
+            return jsonify({'success': False, 'error': 'Invalid movement type'}), 400
+        
+        if quantity_change <= 0:
+            return jsonify({'success': False, 'error': 'Quantity must be positive'}), 400
+        
+        conn = sqlite3.connect('barcodes.db')
+        cursor = conn.cursor()
+        
+        # Get current rack quantity
+        cursor.execute('SELECT quantity FROM racks WHERE id = ?', (rack_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            conn.close()
+            return jsonify({'success': False, 'error': 'Rack not found'}), 404
+        
+        current_quantity = result[0]
+        
+        # Calculate new quantity
+        if movement_type == 'inbound':
+            new_quantity = current_quantity + quantity_change
+        else:  # outbound
+            new_quantity = max(0, current_quantity - quantity_change)  # Don't go below 0
+        
+        # Update rack quantity
+        cursor.execute('''
+            UPDATE racks 
+            SET quantity = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (new_quantity, rack_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Rack quantity updated successfully',
+            'old_quantity': current_quantity,
+            'new_quantity': new_quantity,
+            'change': quantity_change if movement_type == 'inbound' else -quantity_change
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/init-db', methods=['POST'])
 def init_database_endpoint():
     """Initialize database endpoint"""
@@ -819,6 +879,174 @@ def init_database_endpoint():
             'success': True,
             'message': 'Database initialized successfully'
         })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+def parse_structured_barcode(barcode_data):
+    """Parse pipe-separated barcode data into structured format"""
+    if '|' not in barcode_data:
+        return None
+    
+    parts = barcode_data.split('|')
+    if len(parts) < 4:
+        return None
+    
+    try:
+        # Common format: product_id|product_name|category|price|location_x|location_y|location_z|type
+        parsed = {
+            'product_id': parts[0].strip(),
+            'product_name': parts[1].strip(),
+            'category': parts[2].strip(),
+            'price': float(parts[3].strip()) if parts[3].strip().replace('.', '').isdigit() else 0.0,
+            'location_x': float(parts[4].strip()) if len(parts) > 4 and parts[4].strip().replace('.', '').isdigit() else 0.0,
+            'location_y': float(parts[5].strip()) if len(parts) > 5 and parts[5].strip().replace('.', '').isdigit() else 0.0,
+            'location_z': float(parts[6].strip()) if len(parts) > 6 and parts[6].strip().replace('.', '').isdigit() else 0.0,
+            'barcode_type': parts[7].strip() if len(parts) > 7 else 'UNKNOWN'
+        }
+        return parsed
+    except (ValueError, IndexError):
+        return None
+
+@app.route('/api/lookup_barcode', methods=['POST'])
+def lookup_barcode():
+    """Look up barcode in database and return product information"""
+    try:
+        data = request.get_json()
+        barcode = data.get('barcode')
+        
+        if not barcode:
+            return jsonify({
+                'success': False,
+                'error': 'Barcode is required'
+            }), 400
+        
+        # First, try to parse structured data
+        parsed_data = parse_structured_barcode(barcode)
+        
+        conn = sqlite3.connect('barcodes.db')
+        cursor = conn.cursor()
+        
+        # Look up barcode in database
+        cursor.execute('''
+            SELECT barcode_id, barcode_data, barcode_type, product_name, 
+                   product_id, price, location_x, location_y, location_z, 
+                   category, created_at, metadata
+            FROM barcodes 
+            WHERE barcode_data = ? OR barcode_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+        ''', (barcode, barcode))
+        
+        result = cursor.fetchone()
+        
+        if result:
+            # Return product information
+            return jsonify({
+                'success': True,
+                'found': True,
+                'id': result[0],
+                'name': result[3] or f'Product {result[1]}',
+                'category': result[9] or 'Unknown',
+                'price': f'${result[5]:.2f}' if result[5] else 'N/A',
+                'location': f'X:{result[6]}, Y:{result[7]}, Z:{result[8]}' if result[6] is not None else 'Unknown',
+                'lastUpdated': result[10],
+                'status': 'Active',
+                'barcodeData': result[1],
+                'barcodeType': result[2],
+                'productId': result[4]
+            })
+        else:
+            # Barcode not found - create new entry automatically
+            try:
+                # Generate a unique barcode ID
+                barcode_id = f"NEW_{barcode}_{int(datetime.now().timestamp())}"
+                
+                # Use parsed data if available, otherwise use defaults
+                if parsed_data:
+                    product_name = parsed_data['product_name']
+                    category = parsed_data['category']
+                    price = parsed_data['price']
+                    location_x = parsed_data['location_x']
+                    location_y = parsed_data['location_y']
+                    location_z = parsed_data['location_z']
+                    barcode_type = parsed_data['barcode_type']
+                    product_id = parsed_data['product_id']
+                    status = 'Active'  # Structured data is considered valid
+                    needs_review = False
+                else:
+                    product_name = f'New Product {barcode}'
+                    category = 'Unknown'
+                    price = 0.00
+                    location_x = 0.0
+                    location_y = 0.0
+                    location_z = 0.0
+                    barcode_type = 'UNKNOWN'
+                    product_id = barcode
+                    status = 'Needs Review'
+                    needs_review = True
+                
+                # Insert new barcode entry
+                cursor.execute('''
+                    INSERT INTO barcodes (
+                        barcode_id, barcode_data, barcode_type, source,
+                        product_name, product_id, price, location_x, location_y, location_z,
+                        category, created_at, metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    barcode_id,
+                    barcode,
+                    barcode_type,
+                    'esp32_scan',
+                    product_name,
+                    product_id,
+                    price,
+                    location_x,
+                    location_y,
+                    location_z,
+                    category,
+                    datetime.now().isoformat(),
+                    json.dumps({
+                        'auto_created': True,
+                        'created_by': 'esp32_scanner',
+                        'needs_review': needs_review,
+                        'structured_data': parsed_data is not None
+                    })
+                ))
+                
+                conn.commit()
+                conn.close()
+                
+                # Return the newly created product information
+                return jsonify({
+                    'success': True,
+                    'found': False,
+                    'created': True,
+                    'id': barcode_id,
+                    'name': product_name,
+                    'category': category,
+                    'price': f'${price:.2f}',
+                    'location': f'X:{location_x}, Y:{location_y}, Z:{location_z}' if location_x != 0 or location_y != 0 or location_z != 0 else 'Unknown',
+                    'lastUpdated': datetime.now().isoformat(),
+                    'status': status,
+                    'barcodeData': barcode,
+                    'barcodeType': barcode_type,
+                    'productId': product_id,
+                    'message': 'New product created automatically' + (' (from structured data)' if parsed_data else ''),
+                    'structured': parsed_data is not None
+                })
+                
+            except Exception as create_error:
+                conn.close()
+                return jsonify({
+                    'success': True,
+                    'found': False,
+                    'created': False,
+                    'message': f'Barcode not found and could not create new entry: {str(create_error)}'
+                })
+            
     except Exception as e:
         return jsonify({
             'success': False,
@@ -843,6 +1071,7 @@ if __name__ == '__main__':
     print("- GET /get_barcode_by_id/<barcode_id> - Get barcode details by ID")
     print("- GET /get_barcode_data/<barcode_id> - Get structured barcode data")
     print("- GET /list_barcodes - List all barcodes")
+    print("- POST /api/lookup_barcode - Look up barcode in database")
     print("- GET /api/racks - Rack management endpoints")
     print("- GET /api/racks/stats - Rack statistics")
     print("- GET /api/racks/search - Search racks")

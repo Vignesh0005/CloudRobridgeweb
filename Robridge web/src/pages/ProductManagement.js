@@ -12,7 +12,8 @@ import {
   FaFilter,
   FaTimes,
   FaCheck,
-  FaExclamationTriangle
+  FaExclamationTriangle,
+  FaDownload
 } from 'react-icons/fa';
 import './ProductManagement.css';
 
@@ -25,6 +26,7 @@ const ProductManagement = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [availableRacks, setAvailableRacks] = useState([]);
 
   const [formData, setFormData] = useState({
     productName: '',
@@ -34,10 +36,27 @@ const ProductManagement = () => {
     notes: ''
   });
 
-  // Load movements on component mount
+  // Load movements and racks on component mount
   useEffect(() => {
     loadMovements();
+    loadAvailableRacks();
   }, []);
+
+  const loadAvailableRacks = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/racks');
+      const data = await response.json();
+      
+      if (data.success) {
+        setAvailableRacks(data.racks || []);
+      } else {
+        console.error('Failed to load racks:', data.error);
+      }
+    } catch (error) {
+      console.error('Error loading racks:', error);
+      setAvailableRacks([]);
+    }
+  };
 
   const loadMovements = async () => {
     try {
@@ -116,6 +135,35 @@ const ProductManagement = () => {
         status: 'completed'
       };
 
+      // Update rack quantity if rack ID is provided
+      if (formData.rackId) {
+        try {
+          const rackUpdateResponse = await fetch(`http://localhost:3001/api/racks/${formData.rackId}/update-quantity`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              type: movementType,
+              quantity: parseInt(formData.quantity)
+            })
+          });
+
+          const rackUpdateData = await rackUpdateResponse.json();
+          
+          if (rackUpdateData.success) {
+            console.log(`Rack quantity updated: ${rackUpdateData.old_quantity} → ${rackUpdateData.new_quantity}`);
+            // Reload available racks to show updated quantities
+            loadAvailableRacks();
+          } else {
+            console.warn('Failed to update rack quantity:', rackUpdateData.error);
+          }
+        } catch (error) {
+          console.error('Error updating rack quantity:', error);
+          // Don't block the movement recording if rack update fails
+        }
+      }
+
       const updatedMovements = [newMovement, ...movements];
       setMovements(updatedMovements);
       localStorage.setItem('productMovements', JSON.stringify(updatedMovements));
@@ -149,6 +197,64 @@ const ProductManagement = () => {
       quantity: 1,
       notes: ''
     });
+  };
+
+  // Export movements to CSV
+  const exportToCSV = () => {
+    if (movements.length === 0) {
+      alert('No movements to export');
+      return;
+    }
+
+    // Prepare CSV headers
+    const headers = [
+      'S.No',
+      'Date',
+      'Time',
+      'Product Name',
+      'Product ID',
+      'Rack ID',
+      'Movement Type',
+      'Quantity',
+      'Notes'
+    ];
+
+    // Prepare data for CSV
+    const csvData = movements.map((movement, index) => [
+      index + 1,
+      new Date(movement.timestamp).toLocaleDateString(),
+      new Date(movement.timestamp).toLocaleTimeString(),
+      movement.productName,
+      movement.productId,
+      movement.rackId || 'N/A',
+      movement.type.charAt(0).toUpperCase() + movement.type.slice(1),
+      movement.quantity,
+      movement.notes || 'N/A'
+    ]);
+
+    // Combine headers and data
+    const csvContent = [headers, ...csvData]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n');
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      const filename = `product_movements_${timestamp}.csv`;
+      
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const filteredMovements = movements.filter(movement => {
@@ -262,13 +368,25 @@ const ProductManagement = () => {
             </div>
           </div>
 
-          <button 
-            className="btn btn-primary"
-            onClick={() => setShowMovementForm(true)}
-          >
-            <FaPlus />
-            Record Movement
-          </button>
+          <div className="header-buttons">
+            <button 
+              className="btn btn-primary"
+              onClick={() => setShowMovementForm(true)}
+            >
+              <FaPlus />
+              Record Movement
+            </button>
+            
+            <button 
+              className="btn btn-success"
+              onClick={exportToCSV}
+              disabled={movements.length === 0}
+              title="Export movements to CSV"
+            >
+              <FaDownload />
+              Export CSV
+            </button>
+          </div>
         </div>
 
         {/* Movement Recording Form */}
@@ -336,14 +454,27 @@ const ProductManagement = () => {
 
                   <div className="form-row">
                     <div className="form-group">
-                      <label className="form-label">Rack ID</label>
-                      <input
-                        type="text"
+                      <label className="form-label">
+                        <FaWarehouse style={{ marginRight: '5px' }} />
+                        Rack (Optional)
+                      </label>
+                      <select
                         value={formData.rackId}
                         onChange={(e) => handleInputChange('rackId', e.target.value)}
                         className="form-input"
-                        placeholder="Enter rack ID (optional)"
-                      />
+                      >
+                        <option value="">Select a rack (optional)</option>
+                        {availableRacks.map(rack => (
+                          <option key={rack.id} value={rack.id}>
+                            ID: {rack.id} - {rack.rackName} ({rack.productName})
+                          </option>
+                        ))}
+                      </select>
+                      {availableRacks.length === 0 && (
+                        <small style={{ color: '#999', fontSize: '12px' }}>
+                          No racks available. Create racks in Rack Management first.
+                        </small>
+                      )}
                     </div>
                     
                     <div className="form-group">

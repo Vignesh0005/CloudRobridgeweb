@@ -10,9 +10,12 @@ import {
   FaWarehouse,
   FaBox
 } from 'react-icons/fa';
+import { useAuth, ROLES } from '../contexts/AuthContext';
 import './Dashboard.css';
 
 const Dashboard = () => {
+  const { getUserRole } = useAuth();
+  const userRole = getUserRole();
   const stats = [
     { label: 'Total Scans', value: '1,247', icon: FaBarcode, color: '#E3821E' },
     { label: 'Generated Codes', value: '892', icon: FaQrcode, color: '#E3821E' },
@@ -76,7 +79,6 @@ const Dashboard = () => {
     <div className="dashboard">
       <div className="dashboard-header">
         <div className="dashboard-brand">
-          <img src="/logo.png" alt="RobBridge Logo" className="dashboard-logo" />
           <div className="dashboard-title">
             <h1>Dashboard</h1>
             <p>Robot Control and Barcode Management System</p>
@@ -103,26 +105,28 @@ const Dashboard = () => {
       </div>
 
       <div className="dashboard-content">
-        {/* Quick Actions */}
-        <div className="dashboard-section">
-          <h2>Quick Actions</h2>
-          <div className="quick-actions-grid">
-            {quickActions.map((action, index) => {
-              const Icon = action.icon;
-              return (
-                <Link key={index} to={action.path} className="quick-action-card">
-                  <div className="action-icon" style={{ backgroundColor: action.color }}>
-                    <Icon />
-                  </div>
-                  <div className="action-content">
-                    <h3>{action.title}</h3>
-                    <p>{action.description}</p>
-                  </div>
-                </Link>
-              );
-            })}
+        {/* Quick Actions - Hidden for Expo Users */}
+        {userRole !== ROLES.EXPO_USER && (
+          <div className="dashboard-section">
+            <h2>Quick Actions</h2>
+            <div className="quick-actions-grid">
+              {quickActions.map((action, index) => {
+                const Icon = action.icon;
+                return (
+                  <Link key={index} to={action.path} className="quick-action-card">
+                    <div className="action-icon" style={{ backgroundColor: action.color }}>
+                      <Icon />
+                    </div>
+                    <div className="action-content">
+                      <h3>{action.title}</h3>
+                      <p>{action.description}</p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Recent Activity */}
         <div className="dashboard-section">

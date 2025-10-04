@@ -39,7 +39,8 @@ const RackManagement = () => {
   const [formData, setFormData] = useState({
     rackName: '',
     productName: '',
-    productId: ''
+    productId: '',
+    quantity: 0
   });
 
   // Load racks and stats on component mount
@@ -170,7 +171,12 @@ const RackManagement = () => {
 
   const handleAddRack = async () => {
     if (!formData.rackName || !formData.productName || !formData.productId) {
-      alert('Please fill in all fields');
+      alert('Please fill in all required fields');
+      return;
+    }
+    
+    if (formData.quantity < 0) {
+      alert('Quantity cannot be negative');
       return;
     }
 
@@ -188,7 +194,7 @@ const RackManagement = () => {
       const data = await response.json();
       
       if (data.success) {
-        setFormData({ rackName: '', productName: '', productId: '' });
+        setFormData({ rackName: '', productName: '', productId: '', quantity: 0 });
         setShowAddForm(false);
         loadRacks(); // Reload racks
         loadStats(); // Reload stats
@@ -209,7 +215,8 @@ const RackManagement = () => {
     setFormData({
       rackName: rack.rackName,
       productName: rack.productName,
-      productId: rack.productId
+      productId: rack.productId,
+      quantity: rack.quantity || 0
     });
   };
 
@@ -470,10 +477,10 @@ const RackManagement = () => {
                         </div>
                       </div>
                       <div className="product-detail">
-                        <FaBarcode className="barcode-icon" />
+                        <FaTag className="product-id-icon" />
                         <div>
                           <label>Product ID:</label>
-                          <span>{rack.productId}</span>
+                          <span className="product-id-text">{rack.productId}</span>
                         </div>
                       </div>
                     </div>
@@ -595,6 +602,18 @@ const RackManagement = () => {
                 />
               </div>
 
+              <div className="form-group">
+                <label className="label">Initial Quantity</label>
+                <input
+                  type="number"
+                  value={formData.quantity}
+                  onChange={(e) => handleInputChange('quantity', parseInt(e.target.value) || 0)}
+                  className="input"
+                  min="0"
+                  placeholder="0"
+                />
+              </div>
+
               <div className="form-actions">
                 <button 
                   className="btn btn-primary"
@@ -643,7 +662,7 @@ const RackManagement = () => {
                 <div className="table-cell">Rack Name</div>
                 <div className="table-cell">Product Name</div>
                 <div className="table-cell">Product ID</div>
-                <div className="table-cell">Status</div>
+                <div className="table-cell">Quantity</div>
                 <div className="table-cell">Created</div>
                 <div className="table-cell">Actions</div>
               </div>
@@ -664,13 +683,13 @@ const RackManagement = () => {
                   </div>
                   <div className="table-cell">
                     <div className="product-id">
-                      <FaBarcode className="barcode-icon" />
-                      {rack.productId}
+                      <FaTag className="product-id-icon" />
+                      <span className="product-id-text">{rack.productId}</span>
                     </div>
                   </div>
                   <div className="table-cell">
-                    <span className={`status-badge ${rack.status}`}>
-                      {rack.status}
+                    <span className="quantity-badge">
+                      {rack.quantity || 0} units
                     </span>
                   </div>
                   <div className="table-cell">

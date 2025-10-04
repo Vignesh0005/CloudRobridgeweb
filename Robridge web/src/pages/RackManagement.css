@@ -312,7 +312,8 @@
 }
 
 .product-detail .product-icon,
-.product-detail .barcode-icon {
+.product-detail .barcode-icon,
+.product-detail .product-id-icon {
   color: #5F6368;
   font-size: 14px;
   width: 16px;
@@ -668,9 +669,21 @@
 
 .rack-icon,
 .product-icon,
-.barcode-icon {
+.barcode-icon,
+.product-id-icon {
   color: #5F6368;
   font-size: 14px;
+}
+
+.product-id-text {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #007ACC;
+  background: #F0F7FF;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #E3F2FD;
+  font-size: 13px;
 }
 
 .status-badge {

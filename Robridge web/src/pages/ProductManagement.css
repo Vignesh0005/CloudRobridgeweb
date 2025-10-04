@@ -39,6 +39,52 @@
   font-size: 16px;
 }
 
+.header-buttons {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.header-buttons .btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.header-buttons .btn-primary {
+  background: #E3821E;
+  color: white;
+}
+
+.header-buttons .btn-primary:hover {
+  background: #D1700F;
+  transform: translateY(-1px);
+}
+
+.header-buttons .btn-success {
+  background: #34A853;
+  color: white;
+}
+
+.header-buttons .btn-success:hover:not(:disabled) {
+  background: #2D8F47;
+  transform: translateY(-1px);
+}
+
+.header-buttons .btn:disabled {
+  background: #E0E0E0;
+  color: #9E9E9E;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .success-message {
   position: absolute;
   top: 24px;

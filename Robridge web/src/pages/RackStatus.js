@@ -71,8 +71,8 @@ const RackStatus = () => {
         prevRacks.map(rack => ({
           ...rack,
           lastUpdated: new Date().toLocaleString(),
-          temperature: (rack.temperature + (Math.random() - 0.5) * 0.5).toFixed(1),
-          humidity: Math.max(30, Math.min(60, rack.humidity + (Math.random() - 0.5) * 2))
+          temperature: (parseFloat(rack.temperature || 20) + (Math.random() - 0.5) * 0.5).toFixed(1),
+          humidity: Math.max(30, Math.min(60, parseFloat(rack.humidity || 45) + (Math.random() - 0.5) * 2))
         }))
       );
     }, 5000);
@@ -307,12 +307,12 @@ const RackStatus = () => {
               
               <div className="detail-item">
                 <span className="detail-label">Temperature:</span>
-                <span className="detail-value">{rack.temperature}°C</span>
+                <span className="detail-value">{parseFloat(rack.temperature || 20).toFixed(1)}°C</span>
               </div>
               
               <div className="detail-item">
                 <span className="detail-label">Humidity:</span>
-                <span className="detail-value">{rack.humidity}%</span>
+                <span className="detail-value">{Math.round(parseFloat(rack.humidity || 45))}%</span>
               </div>
             </div>
             
@@ -373,11 +373,11 @@ const RackStatus = () => {
                 <div className="modal-details">
                   <div className="modal-detail-item">
                     <span className="modal-label">Temperature:</span>
-                    <span className="modal-value">{selectedRack.temperature}°C</span>
+                    <span className="modal-value">{parseFloat(selectedRack.temperature || 20).toFixed(1)}°C</span>
                   </div>
                   <div className="modal-detail-item">
                     <span className="modal-label">Humidity:</span>
-                    <span className="modal-value">{selectedRack.humidity}%</span>
+                    <span className="modal-value">{Math.round(parseFloat(selectedRack.humidity || 45))}%</span>
                   </div>
                   <div className="modal-detail-item">
                     <span className="modal-label">Capacity:</span>

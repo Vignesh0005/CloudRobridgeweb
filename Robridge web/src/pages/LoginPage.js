@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaEye, FaEyeSlash, FaLock, FaEnvelope, FaSignInAlt } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaLock, FaEnvelope, FaSignInAlt, FaUser, FaCrown, FaShieldAlt } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 import './LoginPage.css';
 
@@ -12,6 +12,7 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -19,14 +20,16 @@ const LoginPage = () => {
       ...prev,
       [name]: value
     }));
-    // Clear error when user starts typing
+    // Clear messages when user starts typing
     if (error) setError('');
+    if (success) setSuccess('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setSuccess('');
 
     // Basic validation
     if (!formData.email || !formData.password) {
@@ -46,19 +49,14 @@ const LoginPage = () => {
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // For demo purposes, accept any email/password combination
-      // In a real app, you would validate against your backend
-      console.log('Login attempt:', formData);
+      // Call the login function from auth context with role-based validation
+      const result = login(formData.email, formData.password);
       
-      // Call the login function from auth context
-      const success = login({
-        email: formData.email,
-        name: formData.email.split('@')[0],
-        isAuthenticated: true
-      });
-      
-      if (!success) {
-        setError('Login failed. Please try again.');
+      if (result.success) {
+        setSuccess(result.message);
+        // The AuthContext will handle the redirect automatically
+      } else {
+        setError(result.message);
       }
       
     } catch (err) {
@@ -79,10 +77,21 @@ const LoginPage = () => {
       </div>
       
       <div className="login-center">
-        <div className="top-left-logo">
-          <img src="/logo.png" alt="RobBridge Logo" className="logo-image" />
-        </div>
         <div className="login-header">
+          <div className="login-logo">
+            <img 
+              src="/robridge-logo.png" 
+              alt="Robridge Logo" 
+              className="logo-image"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'block';
+              }}
+            />
+            <div className="logo-fallback" style={{display: 'none'}}>
+              <div className="logo-text">ROBRIDGE</div>
+            </div>
+          </div>
           <h1 className="login-title">Welcome</h1>
           <p className="login-subtitle">Robot Control and Barcode Management System</p>
         </div>
@@ -140,6 +149,12 @@ const LoginPage = () => {
             </div>
           )}
 
+          {success && (
+            <div className="success-message">
+              {success}
+            </div>
+          )}
+
           <button
             type="submit"
             className={`login-button ${isLoading ? 'loading' : ''}`}
@@ -162,30 +177,69 @@ const LoginPage = () => {
         <div className="login-footer">
           <div className="demo-credentials-section">
             <div className="section-divider"></div>
-            <h3 className="demo-title">Demo Credentials:</h3>
+            <h3 className="demo-title">Role-Based Access:</h3>
             <p className="demo-description">
-              The system automatically detects your access level based on your credentials.
+              The system automatically detects your access level based on your email domain.
             </p>
+            
+            <div className="role-examples">
+              <div className="role-item">
+                <FaUser className="role-icon expo-icon" />
+                <div className="role-info">
+                  <strong>@expo.com / @expo.dev / @expo.io</strong>
+                  <span>Expo User - Dashboard, Scanner, Device Connected</span>
+                </div>
+              </div>
+              
+              <div className="role-item">
+                <FaShieldAlt className="role-icon admin-icon" />
+                <div className="role-info">
+                  <strong>@admin.robridge.com</strong>
+                  <span>Admin - Full Access + Admin Controls</span>
+                </div>
+              </div>
+              
+              <div className="role-item">
+                <FaCrown className="role-icon full-icon" />
+                <div className="role-info">
+                  <strong>@robridge.com</strong>
+                  <span>Full Access - All Features</span>
+                </div>
+              </div>
+            </div>
             
             <div className="demo-buttons">
               <button 
                 type="button" 
-                className="demo-btn user-btn"
+                className="demo-btn expo-btn"
                 onClick={() => {
-                  setFormData({ email: 'user@gmail.com', password: 'user123' });
+                  setFormData({ email: 'user@expo.com', password: 'expo123' });
                 }}
               >
-                User Access
+                <FaUser />
+                Expo User
               </button>
               
               <button 
                 type="button" 
                 className="demo-btn admin-btn"
                 onClick={() => {
-                  setFormData({ email: 'admin@gmail.com', password: 'admin123' });
+                  setFormData({ email: 'admin@admin.robridge.com', password: 'admin123' });
                 }}
               >
+                <FaShieldAlt />
                 Admin Access
+              </button>
+              
+              <button 
+                type="button" 
+                className="demo-btn full-btn"
+                onClick={() => {
+                  setFormData({ email: 'user@robridge.com', password: 'full123' });
+                }}
+              >
+                <FaCrown />
+                Full Access
               </button>
             </div>
           </div>

@@ -36,26 +36,6 @@
   50% { transform: translateY(-20px) rotate(1deg); }
 }
 
-.top-left-logo {
-  position: relative;
-  top: 0;
-  left: 0;
-  z-index: 3;
-  display: flex;
-  justify-content: center;
-  margin-bottom: 20px;
-}
-
-.logo-image {
-  width: 800px;
-  height: auto;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
-  transition: transform 0.3s ease;
-}
-
-.logo-image:hover {
-  transform: scale(1.05);
-}
 
 .login-center {
   display: flex;
@@ -85,7 +65,44 @@
   margin-bottom: 50px;
 }
 
+.login-logo {
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
 
+.logo-image {
+  width: 300px;
+  height: 300px;
+  object-fit: contain;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: transform 0.3s ease;
+}
+
+.logo-image:hover {
+  transform: scale(1.05);
+}
+
+.logo-fallback {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 300px;
+  height: 300px;
+  background: linear-gradient(135deg, #E3821E, #FF6B35);
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.logo-text {
+  color: white;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
 
 .login-title {
   font-size: 48px;
@@ -215,6 +232,29 @@
   font-weight: 500;
   margin-bottom: 20px;
   animation: shake 0.5s ease-in-out;
+}
+
+.success-message {
+  background: rgba(52, 168, 83, 0.1);
+  border: 1px solid #34A853;
+  color: #34A853;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 20px;
+  animation: slideIn 0.3s ease-in-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes shake {
@@ -546,4 +586,99 @@
   .credential-value {
     text-align: left;
   }
+}
+
+/* Role-based styling */
+.role-examples {
+  margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.role-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.role-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateX(4px);
+}
+
+.role-icon {
+  font-size: 20px;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.role-icon.expo-icon {
+  color: #34A853;
+}
+
+.role-icon.admin-icon {
+  color: #E3821E;
+}
+
+.role-icon.full-icon {
+  color: #9C27B0;
+}
+
+.role-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.role-info strong {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.role-info span {
+  color: #b0b0b0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.demo-btn.expo-btn {
+  background: linear-gradient(135deg, #34A853, #2E7D32);
+  border: 1px solid #34A853;
+}
+
+.demo-btn.expo-btn:hover {
+  background: linear-gradient(135deg, #2E7D32, #1B5E20);
+  transform: translateY(-2px);
+}
+
+.demo-btn.full-btn {
+  background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+  border: 1px solid #9C27B0;
+}
+
+.demo-btn.full-btn:hover {
+  background: linear-gradient(135deg, #7B1FA2, #6A1B9A);
+  transform: translateY(-2px);
+}
+
+.demo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.demo-btn svg {
+  font-size: 16px;
 }

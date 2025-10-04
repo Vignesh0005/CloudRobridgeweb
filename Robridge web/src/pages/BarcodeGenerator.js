@@ -48,6 +48,7 @@ const BarcodeGenerator = () => {
     'Automotive',
     'Health & Beauty',
     'Toys & Games',
+    'Stationary',
     'Other'
   ];
 
