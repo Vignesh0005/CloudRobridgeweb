@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaEye, FaEyeSlash, FaLock, FaEnvelope, FaSignInAlt, FaUser, FaCrown, FaShieldAlt } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaLock, FaEnvelope, FaSignInAlt, FaUser, FaShieldAlt, FaCrown } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 import './LoginPage.css';
 
@@ -78,19 +78,17 @@ const LoginPage = () => {
       
       <div className="login-center">
         <div className="login-header">
-          <div className="login-logo">
-            <img 
-              src="/robridge-logo.png" 
-              alt="Robridge Logo" 
-              className="logo-image"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                e.target.nextSibling.style.display = 'block';
-              }}
-            />
-            <div className="logo-fallback" style={{display: 'none'}}>
-              <div className="logo-text">ROBRIDGE</div>
-            </div>
+          <img 
+            src="/robridge-logo.png" 
+            alt="Robridge Logo" 
+            className="logo-image"
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'block';
+            }}
+          />
+          <div className="logo-fallback" style={{display: 'none'}}>
+            <div className="-text">ROBRIDGE</div>
           </div>
           <h1 className="login-title">Welcome</h1>
           <p className="login-subtitle">Robot Control and Barcode Management System</p>
@@ -99,39 +97,39 @@ const LoginPage = () => {
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="form-group">
             <div className="input-container">
-              <div className="input-icon">
-                <FaEnvelope />
-              </div>
               <input
                 type="email"
                 id="email"
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className="form-input"
+                className="form-input with-icon"
                 placeholder="Gmail"
                 required
                 disabled={isLoading}
               />
+              <div className="input-icon-inside">
+                <FaEnvelope />
+              </div>
             </div>
           </div>
 
           <div className="form-group">
             <div className="input-container">
-              <div className="input-icon">
-                <FaLock />
-              </div>
               <input
                 type={showPassword ? 'text' : 'password'}
                 id="password"
                 name="password"
                 value={formData.password}
                 onChange={handleInputChange}
-                className="form-input"
+                className="form-input with-icon"
                 placeholder="Password"
                 required
                 disabled={isLoading}
               />
+              <div className="input-icon-inside">
+                <FaLock />
+              </div>
               <button
                 type="button"
                 className="password-toggle"
@@ -174,76 +172,58 @@ const LoginPage = () => {
           </button>
         </form>
 
-        <div className="login-footer">
-          <div className="demo-credentials-section">
-            <div className="section-divider"></div>
-            <h3 className="demo-title">Role-Based Access:</h3>
-            <p className="demo-description">
-              The system automatically detects your access level based on your email domain.
-            </p>
+        <div className="credential-buttons-section">
+          <div className="section-divider"></div>
+          <h3 className="credential-title">Quick Login:</h3>
+          
+          <div className="credential-buttons">
+            <button 
+              type="button" 
+              className="credential-btn expo-btn"
+              onClick={() => {
+                setFormData({ email: 'user@expo.com', password: 'expo123' });
+              }}
+              disabled={isLoading}
+            >
+              <FaUser />
+              <div className="btn-content">
+                <span className="btn-title">Expo User</span>
+                <span className="btn-subtitle">Dashboard, Scanner, Device</span>
+              </div>
+            </button>
             
-            <div className="role-examples">
-              <div className="role-item">
-                <FaUser className="role-icon expo-icon" />
-                <div className="role-info">
-                  <strong>@expo.com / @expo.dev / @expo.io</strong>
-                  <span>Expo User - Dashboard, Scanner, Device Connected</span>
-                </div>
+            <button 
+              type="button" 
+              className="credential-btn admin-btn"
+              onClick={() => {
+                setFormData({ email: 'admin@admin.robridge.com', password: 'admin123' });
+              }}
+              disabled={isLoading}
+            >
+              <FaShieldAlt />
+              <div className="btn-content">
+                <span className="btn-title">Admin Access</span>
+                <span className="btn-subtitle">Full Access + Admin Controls</span>
               </div>
-              
-              <div className="role-item">
-                <FaShieldAlt className="role-icon admin-icon" />
-                <div className="role-info">
-                  <strong>@admin.robridge.com</strong>
-                  <span>Admin - Full Access + Admin Controls</span>
-                </div>
-              </div>
-              
-              <div className="role-item">
-                <FaCrown className="role-icon full-icon" />
-                <div className="role-info">
-                  <strong>@robridge.com</strong>
-                  <span>Full Access - All Features</span>
-                </div>
-              </div>
-            </div>
+            </button>
             
-            <div className="demo-buttons">
-              <button 
-                type="button" 
-                className="demo-btn expo-btn"
-                onClick={() => {
-                  setFormData({ email: 'user@expo.com', password: 'expo123' });
-                }}
-              >
-                <FaUser />
-                Expo User
-              </button>
-              
-              <button 
-                type="button" 
-                className="demo-btn admin-btn"
-                onClick={() => {
-                  setFormData({ email: 'admin@admin.robridge.com', password: 'admin123' });
-                }}
-              >
-                <FaShieldAlt />
-                Admin Access
-              </button>
-              
-              <button 
-                type="button" 
-                className="demo-btn full-btn"
-                onClick={() => {
-                  setFormData({ email: 'user@robridge.com', password: 'full123' });
-                }}
-              >
-                <FaCrown />
-                Full Access
-              </button>
-            </div>
+            <button 
+              type="button" 
+              className="credential-btn full-btn"
+              onClick={() => {
+                setFormData({ email: 'user@robridge.com', password: 'full123' });
+              }}
+              disabled={isLoading}
+            >
+              <FaCrown />
+              <div className="btn-content">
+                <span className="btn-title">Full Access</span>
+                <span className="btn-subtitle">All Features</span>
+              </div>
+            </button>
           </div>
         </div>
+
       </div>
     </div>
   );

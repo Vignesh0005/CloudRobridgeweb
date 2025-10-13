@@ -1,65 +1,55 @@
 import React, { useState, useEffect } from 'react';
-import { FaCheck, FaTimes, FaDownload, FaBarcode, FaMicrochip, FaSignal } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaDownload, FaMicrochip, FaSignal } from 'react-icons/fa';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import './BarcodeScanner.css';
 
 const BarcodeScanner = () => {
-  const [scannedCode, setScannedCode] = useState('');
-  const [scanResult, setScanResult] = useState(null);
   const [scannedBarcodes, setScannedBarcodes] = useState([]);
   const [activeTab, setActiveTab] = useState('scanner'); // 'scanner' or 'history'
   const [loading, setLoading] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const { isConnected, esp32Devices, latestScan, analyzerResults, setAnalyzerResults } = useWebSocket();
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [selectedBarcode, setSelectedBarcode] = useState(null);
+  const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
+  const { isConnected, esp32Devices, latestScan, setLatestScan, isProcessingScan } = useWebSocket();
 
-  // Handle latest scan updates
-  useEffect(() => {
-    if (latestScan) {
-      setScannedCode(latestScan.barcodeData);
-      setScanResult(latestScan.dbRecord || null);
-      // Analysis is now handled automatically by WebSocket context
-    }
-  }, [latestScan]);
-
-  // Manual analyze function for manual input
-  const handleAnalyze = async () => {
-    if (!scannedCode.trim()) return;
-    
-    setAnalyzing(true);
-    try {
-      const response = await fetch('http://localhost:5001/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ scanned_value: scannedCode })
-      });
-      
-      const result = await response.json();
-      setAnalyzerResults(result);
-    } catch (error) {
-      console.error('Error analyzing code:', error);
-      setAnalyzerResults({
-        scanned_code: scannedCode,
-        title: 'Analysis Failed',
-        category: 'Error',
-        description: 'Unable to analyze the scanned code.',
-        type: 'error',
-        confidence: 'low'
-      });
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
-  // Fetch scanned barcodes from database
+  // Fetch scanned barcodes from database (only ESP32 source)
   const fetchScannedBarcodes = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/barcodes/scanned?limit=50');
+      // Only fetch ESP32 source types, exclude GM77_SCAN
+      // Note: We'll fetch all and filter client-side since API only supports single source parameter
+      const response = await fetch('http://localhost:3001/api/barcodes/scanned?limit=100');
       const data = await response.json();
       if (data.success) {
-        setScannedBarcodes(data.barcodes);
+        console.log('📊 Total barcodes fetched:', data.barcodes.length);
+        
+        // Filter to only show ESP32 source scans (not ESP32_LIVE_SCANNER, not GM77_SCAN)
+        const esp32Barcodes = data.barcodes.filter(barcode => {
+          const source = (barcode.source || '').toUpperCase();
+          return source === 'ESP32';
+        });
+        
+        console.log('✅ ESP32 source barcodes after filtering:', esp32Barcodes.length);
+        console.log('🚫 Filtered out non-ESP32 source entries');
+        
+        // Debug: Show AI analysis categories
+        esp32Barcodes.slice(0, 3).forEach((barcode, index) => {
+          try {
+            const metadata = typeof barcode.metadata === 'string' ? JSON.parse(barcode.metadata) : barcode.metadata;
+            console.log(`🔍 Barcode ${index + 1}: ${barcode.barcode_data}`);
+            console.log(`   Database Category: "${barcode.category}"`);
+            if (metadata.aiAnalysis) {
+              console.log(`   AI Analysis Category: "${metadata.aiAnalysis.category}"`);
+              console.log(`   AI Analysis Title: "${metadata.aiAnalysis.title}"`);
+            } else {
+              console.log(`   No AI Analysis found`);
+            }
+          } catch (e) {
+            console.log(`   Error parsing metadata: ${e.message}`);
+          }
+        });
+        
+        setScannedBarcodes(esp32Barcodes);
       }
     } catch (error) {
       console.error('Error fetching scanned barcodes:', error);
@@ -75,10 +65,170 @@ const BarcodeScanner = () => {
     }
   }, [activeTab]);
 
+  // Auto-saving disabled - user must click "Save This Scan" button manually
+  // useEffect(() => {
+  //   if (latestScan && !isProcessingScan) {
+  //     setAutoSaving(true);
+  //     setTimeout(() => {
+  //       setAutoSaving(false);
+  //     }, 2000);
+  //   }
+  // }, [latestScan, isProcessingScan]);
+
   const resetScanner = () => {
-    setScannedCode('');
-    setScanResult(null);
-    setAnalyzerResults(null);
+    // Clear the latest scan data
+    setLatestScan(null);
+  };
+
+  // Save current scan to Saved Scans
+  const saveCurrentScan = async () => {
+    if (!latestScan) {
+      alert('No scan to save');
+      return;
+    }
+
+    // Only allow ESP32 source scans to be saved
+    const source = (latestScan.source || '').toUpperCase();
+    if (source !== 'ESP32') {
+      alert('❌ Only ESP32 source scans can be saved.');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:3001/api/save-scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          barcode_data: latestScan.barcodeData,
+          barcode_type: latestScan.scanType || 'unknown',
+          source: 'esp32',
+          product_name: latestScan.aiAnalysis?.title || 'Unknown Product',
+          category: latestScan.aiAnalysis?.category || 'Unknown',
+          price: 0,
+          description: latestScan.aiAnalysis?.description || '',
+          metadata: {
+            deviceId: latestScan.deviceId,
+            deviceName: latestScan.deviceName,
+            aiAnalysis: latestScan.aiAnalysis,
+            timestamp: latestScan.timestamp
+          }
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert('✅ Scan saved successfully! View in "Saved Scans" page.');
+      } else {
+        if (result.duplicate) {
+          alert('⚠️ ' + result.error + '\n\nLast saved: ' + new Date(result.lastSaved).toLocaleString());
+        } else {
+          alert('❌ Failed to save scan: ' + (result.error || 'Unknown error'));
+        }
+      }
+    } catch (error) {
+      console.error('Error saving scan:', error);
+      alert('❌ Error saving scan. Please ensure the server is running.');
+    }
+  };
+
+  // Save barcode from history to Saved Scans
+  const saveBarcodeFromHistory = async (barcode) => {
+    // Only allow ESP32 source scans to be saved
+    const source = (barcode.source || '').toUpperCase();
+    if (source !== 'ESP32') {
+      alert('❌ Only ESP32 source scans can be saved.');
+      return;
+    }
+
+    try {
+      // Parse metadata if it's a string
+      let metadata = {};
+      try {
+        metadata = typeof barcode.metadata === 'string' ? JSON.parse(barcode.metadata) : barcode.metadata;
+      } catch (e) {
+        metadata = {};
+      }
+
+      const response = await fetch('http://localhost:3001/api/save-scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          barcode_data: barcode.barcode_data,
+          barcode_type: barcode.barcode_type || 'ESP32_SCAN',
+          source: barcode.source || 'esp32',
+          product_name: barcode.product_name || 'Unknown Product',
+          category: barcode.category || 'Unknown',
+          price: barcode.price || 0,
+          description: metadata.description || metadata.productDetails || '',
+          metadata: {
+            originalId: barcode.id,
+            originalTimestamp: barcode.created_at,
+            deviceId: metadata.deviceId || 'ESP32_GM77_SCANNER_001',
+            deviceName: metadata.deviceName || 'ESP32-GM77-Barcode-Scanner',
+            aiAnalysis: metadata.aiAnalysis || null,
+            savedFromHistory: true
+          }
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert('✅ Scan saved successfully! View in "Saved Scans" page.');
+      } else {
+        if (result.duplicate) {
+          alert('⚠️ ' + result.error + '\n\nLast saved: ' + new Date(result.lastSaved).toLocaleString());
+        } else {
+          alert('❌ Failed to save scan: ' + (result.error || 'Unknown error'));
+        }
+      }
+    } catch (error) {
+      console.error('Error saving scan from history:', error);
+      alert('❌ Error saving scan. Please ensure the server is running.');
+    }
+  };
+
+  // Delete barcode from history
+  const deleteBarcodeFromHistory = async (barcode) => {
+    if (!window.confirm(`Are you sure you want to delete this scan?\n\nBarcode: ${barcode.barcode_data}`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/barcodes/${barcode.id}`, {
+        method: 'DELETE'
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert('✅ Scan deleted successfully!');
+        // Refresh the list
+        fetchScannedBarcodes();
+      } else {
+        alert('❌ Failed to delete scan: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error deleting scan from history:', error);
+      alert('❌ Error deleting scan. Please ensure the server is running.');
+    }
+  };
+
+  // Handle barcode row click to show details
+  const handleBarcodeClick = (barcode) => {
+    setSelectedBarcode(barcode);
+    setShowBarcodeDialog(true);
+  };
+
+  // Close barcode details dialog
+  const closeBarcodeDialog = () => {
+    setShowBarcodeDialog(false);
+    setSelectedBarcode(null);
   };
 
   return (
@@ -94,7 +244,6 @@ const BarcodeScanner = () => {
           className={`tab-button ${activeTab === 'scanner' ? 'active' : ''}`}
           onClick={() => setActiveTab('scanner')}
         >
-          <FaBarcode />
           Live Scanner
         </button>
         <button 
@@ -159,175 +308,103 @@ const BarcodeScanner = () => {
                 </div>
               )}
               
-                  {latestScan && (
-                    <div className="latest-scan">
-                      <h3>Latest Device Connected Scan</h3>
-                      <div className="scan-info">
-                        <p><strong>Device:</strong> {latestScan.deviceName}</p>
-                        <p><strong>Barcode:</strong> {latestScan.barcodeData}</p>
-                        <p><strong>Time:</strong> {new Date(latestScan.timestamp).toLocaleString()}</p>
-                        <p><strong>Type:</strong> {latestScan.scanType}</p>
-                      </div>
-                    </div>
-                  )}
 
-                  {/* Manual Input Section */}
-                  <div className="manual-input-section">
-                    <h3>Manual Code Analysis</h3>
-                    <div className="input-group">
-                      <input
-                        type="text"
-                        value={scannedCode}
-                        onChange={(e) => setScannedCode(e.target.value)}
-                        placeholder="Enter barcode, QR code, or URL to analyze..."
-                        className="code-input"
-                      />
-                      <button 
-                        className="btn btn-primary"
-                        onClick={handleAnalyze}
-                        disabled={!scannedCode.trim() || analyzing}
-                      >
-                        {analyzing ? 'Analyzing...' : 'Analyze Code'}
-                      </button>
-                    </div>
-                  </div>
             </div>
         </div>
 
         {/* Right Section - Results */}
         <div className="result-section">
-          {scannedCode ? (
+          {isProcessingScan && !latestScan ? (
             <div className="result-panel card fade-in">
-              <h2>Scan Result</h2>
+              <h2>Processing Scan...</h2>
+              <div className="barcode-info">
+                <div className="scan-details">
+                  <div className="detail-row">
+                    <strong>Status:</strong> Collecting data from ESP32...
+                  </div>
+                  <div className="detail-row">
+                    <strong>Please wait:</strong> Ensuring complete data before display
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : latestScan ? (
+            <div className="result-panel card fade-in">
+              <h2>Live Scan Result</h2>
               
               <div className="barcode-info">
-                <div className="barcode-code">
-                  <strong>Barcode:</strong> {scannedCode}
+                {/* Basic Information Section */}
+                <div className="scan-info-section">
+                  <h3>Basic Information</h3>
+                  <div className="info-grid-two-columns">
+                    <div className="info-column">
+                      <div className="info-field">
+                        <label>Device</label>
+                        <span className="info-value">{latestScan.deviceName || 'Unknown Device'}</span>
+                      </div>
+                      <div className="info-field">
+                        <label>Source</label>
+                        <span className="info-value source-badge">{latestScan.source?.toUpperCase() || 'ESP32'}</span>
+                      </div>
+                      <div className="info-field">
+                        <label>Category</label>
+                        <span className="info-value">{latestScan.aiAnalysis?.category || 'Unknown'}</span>
+                      </div>
+                    </div>
+                    <div className="info-column">
+                      <div className="info-field">
+                        <label>Product Name</label>
+                        <span className="info-value">{latestScan.aiAnalysis?.title || 'Unknown Product'}</span>
+                      </div>
+                      <div className="info-field">
+                        <label>Scan Time</label>
+                        <span className="info-value">{(() => {
+                          // Use the current time when the scan was received, not the ESP32 timestamp
+                          // ESP32 timestamps are often unreliable or in different formats
+                          return new Date().toLocaleString();
+                        })()}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="barcode-image">
-                  <FaBarcode size={100} />
-                  <p>Barcode Image</p>
+
+                {/* Barcode Data Section */}
+                <div className="barcode-data-section">
+                  <h3>Barcode Data</h3>
+                  <div className="barcode-data-container">
+                    <span className="barcode-data-text">{latestScan.barcodeData}</span>
+                  </div>
+                </div>
+
+                {/* AI Analysis / Description Section */}
+                <div className="description-section">
+                  <h3>🤖 AI Analysis</h3>
+                  <div className="description-container">
+                    <p className="description-text">
+                      {(() => {
+                        if (latestScan.aiAnalysis?.description) {
+                          return latestScan.aiAnalysis.description;
+                        }
+                        if (latestScan.aiAnalysis?.description_short) {
+                          return latestScan.aiAnalysis.description_short;
+                        }
+                        if (latestScan.aiAnalysis?.title) {
+                          return `Product identified: ${latestScan.aiAnalysis.title}`;
+                        }
+                        return 'No AI analysis available for this scan.';
+                      })()}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="db-record">
-                <h3>Database Record</h3>
-                {scanResult ? (
-                  <div className="record-table">
-                    <table>
-                      <tbody>
-                        <tr>
-                          <td>Product ID</td>
-                          <td>{scanResult.id}</td>
-                        </tr>
-                        <tr>
-                          <td>Name</td>
-                          <td>{scanResult.name}</td>
-                        </tr>
-                        <tr>
-                          <td>Category</td>
-                          <td>{scanResult.category}</td>
-                        </tr>
-                        <tr>
-                          <td>Price</td>
-                          <td>{scanResult.price}</td>
-                        </tr>
-                        <tr>
-                          <td>Location</td>
-                          <td>{scanResult.location}</td>
-                        </tr>
-                        <tr>
-                          <td>Last Updated</td>
-                          <td>{scanResult.lastUpdated}</td>
-                        </tr>
-                        <tr>
-                          <td>Status</td>
-                          <td>
-                            <span className={`status-badge ${scanResult.status.toLowerCase().replace(' ', '-')}`}>
-                              {scanResult.status}
-                            </span>
-                            {scanResult.created && (
-                              <span className="auto-created-badge">
-                                🆕 Auto-Created
-                              </span>
-                            )}
-                            {scanResult.structured && (
-                              <span className="structured-data-badge">
-                                📊 Structured Data
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="no-db-record">
-                    <div className="warning-message">
-                      <FaTimes className="warning-icon" />
-                      <h4>No Database Record Found</h4>
-                      <p>This barcode is not in the product database.</p>
-                      <p>Possible reasons:</p>
-                      <ul>
-                        <li>Python backend is not running</li>
-                        <li>Barcode not found in database</li>
-                        <li>Database connection issue</li>
-                      </ul>
-                      <div className="action-suggestion">
-                        <p><strong>💡 Tip:</strong> The system will automatically create a new product entry for unknown barcodes.</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
 
-              <div className="analysis-result">
-                <h3>Code Analysis</h3>
-                {analyzing ? (
-                  <div className="analyzing">
-                    <div className="loading-spinner">
-                      <div className="spinner"></div>
-                    </div>
-                    <p>Analyzing scanned code...</p>
-                  </div>
-                ) : analyzerResults ? (
-                  <div className="analysis-content">
-                    <div className="analysis-header">
-                      <h4>{analyzerResults.title}</h4>
-                      <span className={`type-badge ${analyzerResults.type}`}>
-                        {analyzerResults.type.replace('_', ' ').toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="analysis-details">
-                      <div className="detail-row">
-                        <strong>Category:</strong> {analyzerResults.category}
-                      </div>
-                      <div className="detail-row">
-                        <strong>Description:</strong> {analyzerResults.description}
-                      </div>
-                      <div className="detail-row">
-                        <strong>Confidence:</strong> 
-                        <span className={`confidence ${analyzerResults.confidence}`}>
-                          {analyzerResults.confidence.toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="no-analysis">
-                    <p>Click "Analyze Code" to get detailed information</p>
-                    <button className="btn btn-primary" onClick={handleAnalyze}>
-                      Analyze Code
-                    </button>
-                  </div>
-                )}
-              </div>
 
               {/* Action Buttons */}
               <div className="result-actions">
-                <button className="btn btn-success">
+                <button className="btn btn-success" onClick={saveCurrentScan}>
                   <FaCheck />
-                  Validate Record
+                  Save This Scan
                 </button>
                 
                 <button className="btn btn-secondary">
@@ -343,9 +420,8 @@ const BarcodeScanner = () => {
             </div>
           ) : (
             <div className="no-result card">
-              <FaBarcode size={64} />
-              <h3>No Barcode Scanned</h3>
-              <p>Open the camera and scan a barcode to see results here</p>
+              <h3>No Device Connected Scan</h3>
+              <p>Scan a barcode using your Device Connected scanner to see results here</p>
             </div>
           )}
         </div>
@@ -378,33 +454,62 @@ const BarcodeScanner = () => {
                   <tr>
                     <th>ID</th>
                     <th>Barcode Data</th>
-                    <th>Type</th>
                     <th>Source</th>
-                    <th>Product</th>
                     <th>Category</th>
-                    <th>Price</th>
                     <th>Scanned At</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {scannedBarcodes.map((barcode) => (
-                    <tr key={barcode.id}>
+                    <tr key={barcode.id} onClick={() => handleBarcodeClick(barcode)} className="barcode-row">
                       <td>{barcode.id}</td>
                       <td className="barcode-data">{barcode.barcode_data}</td>
-                      <td>
-                        <span className={`type-badge ${barcode.barcode_type}`}>
-                          {barcode.barcode_type.toUpperCase()}
-                        </span>
-                      </td>
                       <td>
                         <span className={`source-badge ${barcode.source}`}>
                           {barcode.source.toUpperCase()}
                         </span>
                       </td>
-                      <td>{barcode.product_name}</td>
-                      <td>{barcode.category}</td>
-                      <td>${barcode.price}</td>
+                      <td>
+                        {(() => {
+                          // Try to get AI analysis category from metadata
+                          try {
+                            const metadata = typeof barcode.metadata === 'string' ? JSON.parse(barcode.metadata) : barcode.metadata;
+                            if (metadata.aiAnalysis && metadata.aiAnalysis.category) {
+                              return metadata.aiAnalysis.category;
+                            }
+                          } catch (e) {
+                            // Fallback to database category
+                          }
+                          return barcode.category || 'Unknown';
+                        })()}
+                      </td>
                       <td>{new Date(barcode.created_at).toLocaleString()}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                          <button 
+                            className="btn btn-primary btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent row click
+                              saveBarcodeFromHistory(barcode);
+                            }}
+                            title="Save this scan to Saved Scans"
+                          >
+                            <FaCheck />
+                            Save
+                          </button>
+                          <button 
+                            className="btn btn-danger btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent row click
+                              deleteBarcodeFromHistory(barcode);
+                            }}
+                            title="Delete this scan"
+                          >
+                            <FaTimes />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -412,11 +517,142 @@ const BarcodeScanner = () => {
             </div>
           ) : (
             <div className="no-barcodes">
-              <FaBarcode size={64} />
               <h3>No Scanned Barcodes Found</h3>
               <p>Start scanning with your Device Connected device to see barcode history here</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Barcode Details Dialog */}
+      {showBarcodeDialog && selectedBarcode && (
+        <div className="barcode-dialog-overlay" onClick={closeBarcodeDialog}>
+          <div className="barcode-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="barcode-dialog-header">
+              <h2>Barcode Details</h2>
+              <button className="close-btn" onClick={closeBarcodeDialog}>
+                <FaTimes />
+              </button>
+            </div>
+            
+            <div className="barcode-dialog-body">
+              {/* Basic Information Section */}
+              <div className="scan-info-section">
+                <h3>Basic Information</h3>
+                <div className="info-grid-two-columns">
+                  <div className="info-column">
+                    <div className="info-field">
+                      <label>ID</label>
+                      <span className="info-value">#{selectedBarcode.id}</span>
+                    </div>
+                    <div className="info-field">
+                      <label>Source</label>
+                      <span className="info-value source-badge">{selectedBarcode.source?.toUpperCase()}</span>
+                    </div>
+                    <div className="info-field">
+                      <label>Category</label>
+                      <span className="info-value">
+                        {(() => {
+                          try {
+                            const metadata = typeof selectedBarcode.metadata === 'string' 
+                              ? JSON.parse(selectedBarcode.metadata) 
+                              : selectedBarcode.metadata;
+                            if (metadata?.aiAnalysis?.category) {
+                              return metadata.aiAnalysis.category;
+                            }
+                          } catch (e) {}
+                          return selectedBarcode.category || 'N/A';
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="info-column">
+                    <div className="info-field">
+                      <label>Product Name</label>
+                      <span className="info-value">
+                        {(() => {
+                          try {
+                            const metadata = typeof selectedBarcode.metadata === 'string' 
+                              ? JSON.parse(selectedBarcode.metadata) 
+                              : selectedBarcode.metadata;
+                            if (metadata?.aiAnalysis?.title) {
+                              return metadata.aiAnalysis.title;
+                            }
+                          } catch (e) {}
+                          return selectedBarcode.product_name || 'N/A';
+                        })()}
+                      </span>
+                    </div>
+                    <div className="info-field">
+                      <label>Type</label>
+                      <span className={`type-badge type-${selectedBarcode.barcode_type || 'unknown'}`}>
+                        {selectedBarcode.barcode_type?.toUpperCase() || 'UNKNOWN'}
+                      </span>
+                    </div>
+                    <div className="info-field">
+                      <label>Scanned At</label>
+                      <span className="info-value">{new Date(selectedBarcode.created_at).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Barcode Data Section */}
+              <div className="barcode-data-section">
+                <h3>Barcode Data</h3>
+                <div className="barcode-data-container">
+                  <span className="barcode-data-text">{selectedBarcode.barcode_data}</span>
+                </div>
+              </div>
+
+              {/* AI Analysis / Description Section */}
+              <div className="description-section">
+                <h3>🤖 AI Analysis</h3>
+                <div className="description-container">
+                  <p className="description-text">
+                    {(() => {
+                      try {
+                        // Try to get description from metadata
+                        if (selectedBarcode.metadata) {
+                          const metadata = typeof selectedBarcode.metadata === 'string' 
+                            ? JSON.parse(selectedBarcode.metadata) 
+                            : selectedBarcode.metadata;
+                          
+                          // Check for AI analysis description
+                          if (metadata.aiAnalysis?.description) {
+                            return metadata.aiAnalysis.description;
+                          }
+                          if (metadata.aiAnalysis?.description_short) {
+                            return metadata.aiAnalysis.description_short;
+                          }
+                          if (metadata.description) {
+                            return metadata.description;
+                          }
+                        }
+                        
+                        // Fallback to description field
+                        if (selectedBarcode.product_description) {
+                          return selectedBarcode.product_description;
+                        }
+                        
+                        // Final fallback
+                        return selectedBarcode.product_name || 'No description available';
+                      } catch (error) {
+                        console.error('Error parsing metadata:', error);
+                        return selectedBarcode.product_name || 'No description available';
+                      }
+                    })()}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="barcode-dialog-footer">
+              <button className="btn btn-secondary" onClick={closeBarcodeDialog}>
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

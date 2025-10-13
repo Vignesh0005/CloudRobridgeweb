@@ -29,6 +29,9 @@ const DeviceConnected = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showConfigure, setShowConfigure] = useState(false);
   const { isConnected, esp32Devices, latestScan } = useWebSocket();
 
 
@@ -124,6 +127,22 @@ const DeviceConnected = () => {
     a.download = 'esp32_devices.csv';
     a.click();
     window.URL.revokeObjectURL(url);
+  };
+
+  const handleDetails = (device) => {
+    setSelectedDevice(device);
+    setShowDetails(true);
+  };
+
+  const handleConfigure = (device) => {
+    setSelectedDevice(device);
+    setShowConfigure(true);
+  };
+
+  const closeModal = () => {
+    setShowDetails(false);
+    setShowConfigure(false);
+    setSelectedDevice(null);
   };
 
   return (
@@ -278,11 +297,17 @@ const DeviceConnected = () => {
               </div>
 
               <div className="device-actions">
-                <button className="btn btn-sm btn-secondary">
+                <button 
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => handleDetails(device)}
+                >
                   <FaInfoCircle />
                   Details
                 </button>
-                <button className="btn btn-sm btn-primary">
+                <button 
+                  className="btn btn-sm btn-primary"
+                  onClick={() => handleConfigure(device)}
+                >
                   <FaEdit />
                   Configure
                 </button>
@@ -298,6 +323,144 @@ const DeviceConnected = () => {
           </div>
         )}
       </div>
+
+      {/* Details Modal */}
+      {showDetails && selectedDevice && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>Device Details</h2>
+              <button className="close-btn" onClick={closeModal}>
+                <FaTimesCircle />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="device-details-grid">
+                <div className="detail-section">
+                  <h3>Basic Information</h3>
+                  <div className="detail-item">
+                    <strong>Device Name:</strong> {selectedDevice.deviceName}
+                  </div>
+                  <div className="detail-item">
+                    <strong>Device ID:</strong> {selectedDevice.deviceId}
+                  </div>
+                  <div className="detail-item">
+                    <strong>Status:</strong> 
+                    <span className="status-badge" style={{ color: getStatusColor(selectedDevice.status) }}>
+                      {getStatusIcon(selectedDevice.status)} {selectedDevice.status}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <strong>IP Address:</strong> {selectedDevice.ipAddress}
+                  </div>
+                  <div className="detail-item">
+                    <strong>Firmware Version:</strong> {selectedDevice.firmwareVersion}
+                  </div>
+                </div>
+                
+                <div className="detail-section">
+                  <h3>Activity</h3>
+                  <div className="detail-item">
+                    <strong>Total Scans:</strong> {selectedDevice.totalScans || 0}
+                  </div>
+                  <div className="detail-item">
+                    <strong>Last Seen:</strong> {new Date(selectedDevice.lastSeen).toLocaleString()}
+                  </div>
+                  <div className="detail-item">
+                    <strong>Connection Time:</strong> {new Date(selectedDevice.lastSeen).toLocaleString()}
+                  </div>
+                </div>
+
+                <div className="detail-section">
+                  <h3>Performance</h3>
+                  <div className="detail-item">
+                    <strong>Signal Strength:</strong> Strong
+                  </div>
+                  <div className="detail-item">
+                    <strong>Battery Level:</strong> 85%
+                  </div>
+                  <div className="detail-item">
+                    <strong>Uptime:</strong> 2h 15m
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={closeModal}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Configure Modal */}
+      {showConfigure && selectedDevice && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>Configure Device</h2>
+              <button className="close-btn" onClick={closeModal}>
+                <FaTimesCircle />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="config-form">
+                <div className="form-group">
+                  <label>Device Name</label>
+                  <input 
+                    type="text" 
+                    defaultValue={selectedDevice.deviceName}
+                    className="form-control"
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Scan Interval (seconds)</label>
+                  <input 
+                    type="number" 
+                    defaultValue="30"
+                    className="form-control"
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Heartbeat Interval (seconds)</label>
+                  <input 
+                    type="number" 
+                    defaultValue="30"
+                    className="form-control"
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Auto Reconnect</label>
+                  <select className="form-control">
+                    <option value="true">Enabled</option>
+                    <option value="false">Disabled</option>
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label>Debug Mode</label>
+                  <select className="form-control">
+                    <option value="false">Disabled</option>
+                    <option value="true">Enabled</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={closeModal}>
+                Cancel
+              </button>
+              <button className="btn btn-primary">
+                Save Configuration
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

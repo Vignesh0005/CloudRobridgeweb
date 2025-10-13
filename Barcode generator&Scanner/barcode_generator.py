@@ -223,8 +223,16 @@ def generate_barcode():
         data = request.get_json()
         
         # Debug logging
+        print("=" * 60)
+        print(f"DEBUG: Received barcode generation request")
         print(f"DEBUG: Received data: {data}")
         print(f"DEBUG: Data type: {type(data)}")
+        
+        # Validate request data
+        if not data:
+            error_msg = 'No data received in request'
+            print(f"ERROR: {error_msg}")
+            return jsonify({'success': False, 'error': error_msg}), 400
         
         # Extract parameters
         barcode_data = data.get('data')
@@ -232,14 +240,16 @@ def generate_barcode():
         source = data.get('source', 'web')  # web, mobile
         metadata = data.get('metadata', {})
         
-        print(f"DEBUG: barcode_data: {barcode_data}")
-        print(f"DEBUG: barcode_type: {barcode_type}")
-        print(f"DEBUG: source: {source}")
+        print(f"DEBUG: barcode_data: '{barcode_data}'")
+        print(f"DEBUG: barcode_type: '{barcode_type}'")
+        print(f"DEBUG: source: '{source}'")
         print(f"DEBUG: metadata: {metadata}")
         print(f"DEBUG: metadata type: {type(metadata)}")
         
-        if not barcode_data:
-            return jsonify({'error': 'Barcode data is required'}), 400
+        if not barcode_data or barcode_data.strip() == '':
+            error_msg = 'Barcode data is required and cannot be empty'
+            print(f"ERROR: {error_msg}")
+            return jsonify({'success': False, 'error': error_msg}), 400
         
         # Create barcodes directory if it doesn't exist
         os.makedirs('barcodes', exist_ok=True)
@@ -299,7 +309,7 @@ def generate_barcode():
         # Return just the filename without the path for the frontend
         filename_only = os.path.basename(final_filename)
         
-        return jsonify({
+        response_data = {
             'success': True,
             'message': f'{barcode_type.upper()} barcode generated successfully',
             'barcode_id': barcode_id,
@@ -307,13 +317,18 @@ def generate_barcode():
             'data': barcode_data,
             'type': barcode_type,
             'source': source
-        })
+        }
+        print(f"DEBUG: Returning success response: {response_data}")
+        print("=" * 60)
+        return jsonify(response_data)
         
     except Exception as e:
-        print(f"ERROR: Exception in generate_barcode: {e}")
+        error_msg = str(e)
+        print(f"ERROR: Exception in generate_barcode: {error_msg}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        print("=" * 60)
+        return jsonify({'success': False, 'error': error_msg}), 500
 
 @app.route('/get_barcode/<filename>')
 def get_barcode(filename):
@@ -1057,6 +1072,63 @@ def lookup_barcode():
 def health_check():
     """Health check endpoint"""
     return jsonify({'status': 'healthy', 'message': 'Barcode generator is running'})
+
+@app.route('/test_generate', methods=['GET'])
+def test_generate():
+    """Test endpoint to verify barcode generation works"""
+    try:
+        print("=" * 60)
+        print("TEST: Running test barcode generation")
+        
+        # Create test data
+        test_data = "TEST_" + datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"barcodes/qr_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Generate QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(test_data)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Ensure directory exists
+        os.makedirs('barcodes', exist_ok=True)
+        
+        # Save image
+        full_path = f"{filename}.png"
+        img.save(full_path)
+        
+        # Check file exists
+        file_exists = os.path.exists(full_path)
+        file_size = os.path.getsize(full_path) if file_exists else 0
+        
+        print(f"TEST: Generated test barcode successfully")
+        print(f"TEST: File: {full_path}")
+        print(f"TEST: Exists: {file_exists}")
+        print(f"TEST: Size: {file_size} bytes")
+        print("=" * 60)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Test barcode generated successfully',
+            'filename': full_path,
+            'file_exists': file_exists,
+            'file_size': file_size,
+            'test_data': test_data
+        })
+    except Exception as e:
+        print(f"TEST ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        print("=" * 60)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 if __name__ == '__main__':
     # Initialize database

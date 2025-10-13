@@ -8,12 +8,25 @@
   padding: 24px;
   background-color: #F5F5F5;
   overflow-y: auto;
+  margin-left: 280px;
+  min-height: 100vh;
+  transition: margin-left 0.3s ease;
+}
+
+/* Handle collapsed sidebar */
+body.sidebar-collapsed .app-main-content {
+  margin-left: 80px;
 }
 
 /* Responsive design */
 @media (max-width: 768px) {
   .app-main-content {
     padding: 16px;
+    margin-left: 0;
+  }
+  
+  body.sidebar-collapsed .app-main-content {
+    margin-left: 0;
   }
 }
 

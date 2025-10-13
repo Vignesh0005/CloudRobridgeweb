@@ -65,20 +65,12 @@
   margin-bottom: 50px;
 }
 
-.login-logo {
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
 .logo-image {
   width: 300px;
   height: 300px;
   object-fit: contain;
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   transition: transform 0.3s ease;
+  margin-bottom: 20px;
 }
 
 .logo-image:hover {
@@ -92,8 +84,7 @@
   width: 300px;
   height: 300px;
   background: linear-gradient(135deg, #E3821E, #FF6B35);
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  margin-bottom: 20px;
 }
 
 .logo-text {
@@ -164,6 +155,25 @@
   transition: all 0.3s ease;
 }
 
+.input-icon-inside {
+  position: absolute;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #E3821E;
+  font-size: 14px;
+  opacity: 0.8;
+  transition: all 0.3s ease;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.input-container:focus-within .input-icon-inside {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
 .form-input {
   flex: 1;
   padding: 0;
@@ -176,6 +186,10 @@
   box-sizing: border-box;
   letter-spacing: 0.1px;
   height: 100%;
+}
+
+.form-input.with-icon {
+  padding-left: 20px;
 }
 
 .form-input::placeholder {
@@ -681,4 +695,125 @@
 
 .demo-btn svg {
   font-size: 16px;
+}
+
+/* Credential Buttons Section */
+.credential-buttons-section {
+  width: 100%;
+  max-width: 400px;
+  margin-top: 30px;
+}
+
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  margin: 20px 0;
+}
+
+.credential-title {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.credential-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.credential-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.credential-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.credential-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.credential-btn svg {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.btn-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.btn-title {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn-subtitle {
+  color: #b0b0b0;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+/* Expo User Button */
+.credential-btn.expo-btn {
+  background: linear-gradient(135deg, #34A853, #2E7D32);
+  border: 1px solid #34A853;
+}
+
+.credential-btn.expo-btn:hover {
+  background: linear-gradient(135deg, #2E7D32, #1B5E20);
+}
+
+.credential-btn.expo-btn svg {
+  color: #ffffff;
+}
+
+/* Admin Button */
+.credential-btn.admin-btn {
+  background: linear-gradient(135deg, #E3821E, #D2691E);
+  border: 1px solid #E3821E;
+}
+
+.credential-btn.admin-btn:hover {
+  background: linear-gradient(135deg, #D2691E, #B8860B);
+}
+
+.credential-btn.admin-btn svg {
+  color: #ffffff;
+}
+
+/* Full Access Button */
+.credential-btn.full-btn {
+  background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+  border: 1px solid #9C27B0;
+}
+
+.credential-btn.full-btn:hover {
+  background: linear-gradient(135deg, #7B1FA2, #6A1B9A);
+}
+
+.credential-btn.full-btn svg {
+  color: #ffffff;
 }

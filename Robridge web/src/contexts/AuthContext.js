@@ -20,14 +20,14 @@ export const ROLES = {
 // Page access control
 export const PAGE_ACCESS = {
   [ROLES.ADMIN]: [
-    '/', '/scanner', '/generator', '/image-processing', '/robot-control',
+    '/', '/scanner', '/generator', '/saved-scans', '/image-processing', '/robot-control',
     '/rack-status', '/rack-management', '/product-management', '/device-connected', '/settings'
   ],
   [ROLES.EXPO_USER]: [
-    '/', '/scanner', '/device-connected'
+    '/', '/scanner', '/saved-scans', '/device-connected'
   ],
   [ROLES.FULL_ACCESS]: [
-    '/', '/scanner', '/generator', '/image-processing', '/robot-control',
+    '/', '/scanner', '/generator', '/saved-scans', '/image-processing', '/robot-control',
     '/rack-status', '/rack-management', '/product-management', '/device-connected', '/settings'
   ]
 };

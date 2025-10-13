@@ -15,39 +15,144 @@ export const WebSocketProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [esp32Devices, setEsp32Devices] = useState([]);
   const [latestScan, setLatestScan] = useState(null);
-  const [analyzerResults, setAnalyzerResults] = useState(null);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const [scanBuffer, setScanBuffer] = useState({});
   const socketRef = useRef(null);
 
-  useEffect(() => {
-    // Function to analyze scanned codes
-    const analyzeScannedCode = async (code) => {
-      if (!code || code.trim() === '') return;
-      
-      try {
-        console.log('Analyzing scanned code:', code);
-        const response = await fetch('http://localhost:5001/analyze', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ scanned_value: code })
+  // Function to check if we have complete scan data
+  const isCompleteScanData = (scanData) => {
+    return scanData && 
+           scanData.barcodeData && 
+           scanData.barcodeData.trim().length > 0 &&
+           scanData.deviceName &&
+           scanData.scanType;
+  };
+
+  // Function to auto-save scan data to database
+  const autoSaveScanToDatabase = async (scanData) => {
+    try {
+      const response = await fetch('http://localhost:3001/api/barcodes/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          barcodeData: scanData.barcodeData,
+          deviceName: scanData.deviceName || 'ESP32 Scanner',
+          deviceId: scanData.deviceId || 'unknown',
+          scanType: scanData.scanType || 'unknown',
+          source: 'esp32_live_scanner',
+          productName: scanData.productInfo?.productName || `Scanned Product ${scanData.barcodeData}`,
+          productId: scanData.barcodeData,
+          price: 0,
+          locationX: 0,
+          locationY: 0,
+          locationZ: 0,
+          category: scanData.productInfo?.productType || 'Scanned',
+          metadata: {
+            deviceName: scanData.deviceName || 'ESP32 Scanner',
+            deviceId: scanData.deviceId || 'unknown',
+            scanType: scanData.scanType || 'unknown',
+            timestamp: scanData.timestamp || new Date().toISOString(),
+            productDetails: scanData.productInfo?.productDetails || '',
+            foundInLocalDB: scanData.productInfo?.foundInLocalDB || false,
+            autoSaved: true,
+            source: 'live_scanner'
+          }
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Live Scanner result auto-saved to database:', result);
+        return result;
+      } else {
+        console.error('Failed to auto-save Live Scanner result:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error auto-saving Live Scanner result:', error);
+    }
+  };
+
+  // Function to buffer and process scan data
+  const processScanData = (scanData, eventType) => {
+    console.log(`🔄 Processing ${eventType}:`, scanData);
+    console.log('📊 AI Analysis in scan data:', scanData.aiAnalysis);
+    console.log('🔍 Scan completeness check:', {
+      hasBarcodeData: !!(scanData.barcodeData && scanData.barcodeData.trim().length > 0),
+      hasDeviceName: !!scanData.deviceName,
+      hasScanType: !!scanData.scanType,
+      source: scanData.source,
+      scanType: scanData.scanType
+    });
+    
+    // Only process ESP32 scans - check by deviceName since ESP32 sends "Scanner" in name
+    const isEsp32Device = scanData.deviceName?.includes('Scanner') || 
+                         scanData.source === 'esp32' || 
+                         scanData.source === 'ESP32_LIVE_SCANNER';
+    
+    if (!isEsp32Device) {
+      console.log('❌ Skipping non-ESP32 scan:', { source: scanData.source, deviceName: scanData.deviceName });
+      return;
+    }
+    
+    console.log('✅ Processing ESP32 scan:', { deviceName: scanData.deviceName, scanType: scanData.scanType });
+    
+    // Buffer the data - make sure to preserve aiAnalysis
+    setScanBuffer(prev => ({
+      ...prev,
+      ...scanData,
+      aiAnalysis: scanData.aiAnalysis || prev.aiAnalysis, // Preserve AI analysis
+      lastUpdate: Date.now(),
+      eventType: eventType
+    }));
+
+    // Check if we have complete data after a short delay
+    setTimeout(() => {
+      setScanBuffer(currentBuffer => {
+        console.log('🔍 Checking scan completeness:', {
+          isComplete: isCompleteScanData(currentBuffer),
+          isProcessing: isProcessingScan,
+          bufferData: currentBuffer
         });
         
-        const result = await response.json();
-        console.log('Analysis result:', result);
-        setAnalyzerResults(result);
-      } catch (error) {
-        console.error('Error analyzing code:', error);
-        setAnalyzerResults({
-          scanned_code: code,
-          title: 'Analysis Failed',
-          category: 'Error',
-          description: 'Unable to analyze the scanned code.',
-          type: 'error',
-          confidence: 'low'
-        });
-      }
-    };
+        if (isCompleteScanData(currentBuffer) && !isProcessingScan) {
+          console.log('✅ Complete scan data found, processing...');
+          setIsProcessingScan(true);
+          
+          const completeScan = {
+            ...currentBuffer,
+            timestamp: currentBuffer.timestamp || Date.now(),
+            aiAnalysis: currentBuffer.aiAnalysis, // Explicitly include AI analysis
+            dbRecord: currentBuffer.productInfo ? {
+              id: currentBuffer.barcodeData,
+              name: currentBuffer.productInfo.productName,
+              category: currentBuffer.productInfo.productType,
+              price: '$0.00',
+              location: 'ESP32 Scanner',
+              lastUpdated: currentBuffer.timestamp || Date.now(),
+              status: currentBuffer.productInfo.foundInLocalDB ? 'ACTIVE' : 'UNKNOWN'
+            } : null
+          };
+          
+          console.log('Setting latest scan with AI analysis:', completeScan.aiAnalysis);
+          setLatestScan(completeScan);
+          
+          // Auto-save disabled - user must click "Save This Scan" button manually
+          // autoSaveScanToDatabase(completeScan);
+          
+          // Reset processing state
+          setTimeout(() => {
+            setIsProcessingScan(false);
+            setScanBuffer({});
+          }, 2000);
+        }
+        return currentBuffer;
+      });
+    }, 500); // Wait 500ms for all data to arrive
+  };
+
+  useEffect(() => {
 
     // Create WebSocket connection
     socketRef.current = io('http://localhost:3001', {
@@ -79,32 +184,13 @@ export const WebSocketProvider = ({ children }) => {
     });
 
     socketRef.current.on('esp32_barcode_scan', (scanData) => {
-      console.log('ESP32 barcode scan received:', scanData);
-      setLatestScan(scanData);
-      
-      // Auto-analyze the scanned code
-      analyzeScannedCode(scanData.barcodeData);
+      console.log('📡 Received esp32_barcode_scan event:', scanData);
+      processScanData(scanData, 'esp32_barcode_scan');
     });
 
     socketRef.current.on('esp32_scan_processed', (scanData) => {
-      console.log('ESP32 scan processed:', scanData);
-      // Transform the scan data to match what the frontend expects
-      const transformedScan = {
-        ...scanData,
-        dbRecord: scanData.productInfo ? {
-          id: scanData.barcodeData,
-          name: scanData.productInfo.productName,
-          category: scanData.productInfo.productType,
-          price: '$0.00', // ESP32 doesn't send price
-          location: 'ESP32 Scanner',
-          lastUpdated: scanData.timestamp,
-          status: scanData.productInfo.foundInLocalDB ? 'ACTIVE' : 'UNKNOWN'
-        } : null
-      };
-      setLatestScan(transformedScan);
-      
-      // Auto-analyze the processed scan
-      analyzeScannedCode(scanData.barcodeData);
+      console.log('📡 Received esp32_scan_processed event:', scanData);
+      processScanData(scanData, 'esp32_scan_processed');
     });
 
     socketRef.current.on('esp32_device_connected', (device) => {
@@ -139,8 +225,8 @@ export const WebSocketProvider = ({ children }) => {
     isConnected,
     esp32Devices,
     latestScan,
-    analyzerResults,
-    setAnalyzerResults,
+    setLatestScan,
+    isProcessingScan,
     socket: socketRef.current
   };
 

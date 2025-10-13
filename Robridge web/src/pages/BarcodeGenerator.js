@@ -54,10 +54,13 @@ const BarcodeGenerator = () => {
 
   // Generate barcode data string from form
   useEffect(() => {
-    const data = Object.values(formData)
-      .filter(value => value && value !== '')
+    // Filter out barcodeType from the values
+    const { barcodeType, ...dataFields } = formData;
+    const data = Object.values(dataFields)
+      .filter(value => value && value !== '' && String(value).trim() !== '')
       .join('|');
     setBarcodeData(data);
+    console.log('Barcode data updated:', data);
   }, [formData]);
 
   // Check if backend is running
@@ -138,7 +141,10 @@ const BarcodeGenerator = () => {
   };
 
     const generateBarcode = async () => {
-    if (!barcodeData) {
+    console.log('Generate barcode clicked. Current barcode data:', barcodeData);
+    console.log('Form data:', formData);
+    
+    if (!barcodeData || barcodeData.trim() === '') {
       alert('Please fill in at least one field to generate a barcode');
       return;
     }
@@ -159,19 +165,23 @@ const BarcodeGenerator = () => {
       type: formData.barcodeType,
       source: 'web',
       metadata: {
-        product_name: formData.name,
-        product_id: formData.id,
-        category: formData.category,
-        price: formData.price,
-        description: formData.description,
-        location: `${formData.locationX},${formData.locationY},${formData.locationZ}`
+        product_name: formData.name || '',
+        product_id: formData.id || '',
+        category: formData.category || '',
+        price: formData.price || '',
+        description: formData.description || '',
+        location: `${formData.locationX || '0'},${formData.locationY || '0'},${formData.locationZ || '0'}`
       }
     };
+    
+    console.log('Request body being sent:', JSON.stringify(requestBody, null, 2));
     
     try {
       const apiUrl = process.env.NODE_ENV === 'production' 
         ? '/api/generate_barcode' 
         : `${API_BASE_URL}/api/generate_barcode`;
+      
+      console.log('Sending request to:', apiUrl);
         
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -180,10 +190,28 @@ const BarcodeGenerator = () => {
         },
         body: JSON.stringify(requestBody)
       });
+      
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
+      // Check if response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server error response:', errorText);
+        alert(`Server error (${response.status}): ${errorText || 'Failed to generate barcode'}`);
+        setIsGenerating(false);
+        return;
+      }
 
       const result = await response.json();
+      console.log('Barcode generation result:', result);
+      console.log('Result.success value:', result.success);
+      console.log('Result.success type:', typeof result.success);
+      console.log('Result keys:', Object.keys(result));
+      console.log('Full result JSON:', JSON.stringify(result, null, 2));
       
-      if (result.success) {
+      // Check if success is explicitly true (not just truthy)
+      if (result.success === true) {
         setBarcodeId(result.barcode_id);
         
         // Handle image data - in production, it comes as base64
@@ -201,11 +229,13 @@ const BarcodeGenerator = () => {
         setSaveMessage('Barcode generated successfully!');
         setTimeout(() => setSaveMessage(''), 3000);
       } else {
-        alert('Error generating barcode: ' + result.error);
+        const errorMessage = result.error || result.message || 'Unknown error occurred';
+        console.error('Barcode generation failed:', errorMessage);
+        alert('Error generating barcode: ' + errorMessage);
       }
     } catch (error) {
       console.error('Error generating barcode:', error);
-      alert('Error connecting to barcode generator server. Please try again.');
+      alert('Error connecting to barcode generator server. Please ensure the backend is running and try again.');
     } finally {
       setIsGenerating(false);
     }

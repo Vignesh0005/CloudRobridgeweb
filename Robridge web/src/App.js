@@ -13,6 +13,7 @@ import RackStatus from './pages/RackStatus';
 import RackManagement from './pages/RackManagement';
 import ProductManagement from './pages/ProductManagement';
 import DeviceConnected from './pages/DeviceConnected';
+import SavedScans from './pages/SavedScans';
 import Settings from './pages/Settings';
 import './App.css';
 
@@ -123,6 +124,11 @@ function AppContent() {
           <Route path="/device-connected" element={
             <ProtectedRoute requiredPath="/device-connected">
               <DeviceConnected />
+            </ProtectedRoute>
+          } />
+          <Route path="/saved-scans" element={
+            <ProtectedRoute requiredPath="/saved-scans">
+              <SavedScans />
             </ProtectedRoute>
           } />
           <Route path="/settings" element={

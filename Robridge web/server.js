@@ -15,11 +15,21 @@ const io = socketIo(server, {
   }
 });
 
-const PORT = 3001;
+// Railway-compatible configuration
+const PORT = process.env.PORT || 3001;
+const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000';
+const FLASK_SERVER_URL = process.env.FLASK_SERVER_URL || 'http://localhost:5000';
+const NODE_ENV = process.env.NODE_ENV || 'development';
+
+console.log('🚀 Server Configuration:');
+console.log(`   PORT: ${PORT}`);
+console.log(`   AI_SERVER_URL: ${AI_SERVER_URL}`);
+console.log(`   FLASK_SERVER_URL: ${FLASK_SERVER_URL}`);
+console.log(`   NODE_ENV: ${NODE_ENV}`);
 
 // Create a separate app for port 3002 redirect
 const redirectApp = express();
-const REDIRECT_PORT = 3002;
+const REDIRECT_PORT = 3003;
 
 // Middleware
 app.use(cors());
@@ -192,11 +202,15 @@ app.post('/api/esp32/ping/:deviceId', (req, res) => {
   }
 });
 
-// ESP32 Barcode Scan Data
+// ESP32 Barcode Scan Data - Enhanced with AI Integration
 app.post('/api/esp32/scan/:deviceId', async (req, res) => {
   try {
     const { deviceId } = req.params;
     const { barcodeData, scanType, imageData, timestamp } = req.body;
+    
+    console.log(`📱 ESP32 scan received from device: ${deviceId}`);
+    console.log('📊 Full request body:', JSON.stringify(req.body, null, 2));
+    console.log('🔍 Scan data:', { barcodeData, scanType, timestamp });
     
     const device = esp32Devices.get(deviceId);
     if (!device) {
@@ -211,7 +225,58 @@ app.post('/api/esp32/scan/:deviceId', async (req, res) => {
     device.lastSeen = new Date().toISOString();
     esp32Devices.set(deviceId, device);
     
-    // Create scan record
+    console.log(`ESP32 barcode scan received from ${device.deviceName}: ${barcodeData}`);
+    
+    // Forward to AI server (server.py) for processing
+    // AI Server runs on port 8000!
+    let aiAnalysis = null;
+    try {
+      console.log(`🤖 Forwarding to AI server at ${AI_SERVER_URL} for barcode: ${barcodeData}`);
+      
+      const aiResponse = await fetch(`${AI_SERVER_URL}/api/esp32/scan`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          barcodeData: barcodeData,
+          deviceId: deviceId,
+          deviceName: device.deviceName,
+          scanType: scanType || 'ESP32_SCAN',
+          timestamp: timestamp || Date.now()
+        }),
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+      
+      if (aiResponse.ok) {
+        aiAnalysis = await aiResponse.json();
+        console.log('✅ AI Analysis completed successfully!');
+        console.log('AI Analysis:', JSON.stringify(aiAnalysis, null, 2));
+      } else {
+        console.log(`⚠️ AI server returned status ${aiResponse.status}, no AI analysis available`);
+      }
+    } catch (aiError) {
+      console.error('❌ AI server communication error:', aiError.message);
+      console.log(`ℹ️  Make sure AI server is running at: ${AI_SERVER_URL}`);
+    }
+    
+    // Provide fallback if no AI analysis available
+    if (!aiAnalysis) {
+      console.log('📦 Using fallback analysis (AI server not available)');
+      aiAnalysis = {
+        success: true,
+        title: `Product ${barcodeData.substring(0, 20)}`,
+        category: 'Scanned Product',
+        description: 'Product scanned successfully. Start AI server on port 8000 for detailed analysis.',
+        description_short: `Scanned: ${barcodeData.substring(0, 30)}`,
+        country: 'Unknown',
+        barcode: barcodeData,
+        deviceId: deviceId,
+        fallback: true
+      };
+    }
+    
+    // Create scan record with AI analysis
     const scanRecord = {
       id: `scan_${Date.now()}_${deviceId}`,
       deviceId,
@@ -220,77 +285,97 @@ app.post('/api/esp32/scan/:deviceId', async (req, res) => {
       scanType: scanType || 'unknown',
       imageData: imageData || null,
       timestamp: timestamp || new Date().toISOString(),
-      processed: false
+      processed: true,
+      aiAnalysis: aiAnalysis // This will now ALWAYS have data
     };
     
-    // Extract product information from ESP32 payload (if available)
-    const { productName, productType, productDetails, foundInLocalDB } = req.body;
-    
-    // Only save to database if ESP32 found the product in its local array
-    if (foundInLocalDB && productName) {
-      try {
-        const dbScanData = {
-          barcodeData,
+    // Save to database with AI analysis
+    try {
+      const dbScanData = {
+        barcodeData,
+        deviceName: device.deviceName,
+        deviceId,
+        scanType: scanType || 'unknown',
+        source: 'esp32',
+        productName: aiAnalysis?.title || 'Unknown Product',
+        productId: barcodeData,
+        price: 0,
+        locationX: 0,
+        locationY: 0,
+        locationZ: 0,
+        category: aiAnalysis?.category || 'Unknown',
+        metadata: {
           deviceName: device.deviceName,
-          deviceId,
+          deviceId: deviceId,
           scanType: scanType || 'unknown',
-          source: 'esp32',
-          productName: productName,
-          productId: barcodeData,
-          price: 0,
-          locationX: 0,
-          locationY: 0,
-          locationZ: 0,
-          category: productType || 'Unknown',
-          metadata: {
-            deviceName: device.deviceName,
-            deviceId: deviceId,
-            scanType: scanType || 'unknown',
-            timestamp: timestamp || new Date().toISOString(),
-            productDetails: productDetails || '',
-            foundInLocalDB: true
-          }
-        };
-        
-        const dbResult = await saveBarcodeScan(dbScanData);
-        console.log('Product found and saved to database:', dbResult);
-      } catch (dbError) {
-        console.error('Error saving to database:', dbError);
-      }
-    } else {
-      console.log('Product not found in ESP32 local database - not saving to server database');
+          timestamp: timestamp || new Date().toISOString(),
+          aiAnalysis: aiAnalysis,
+          description: aiAnalysis?.description || 'No AI analysis available',
+          country: aiAnalysis?.country || null
+        }
+      };
+      
+      const dbResult = await saveBarcodeScan(dbScanData);
+      console.log('Scan saved to database with AI analysis:', dbResult);
+    } catch (dbError) {
+      console.error('Error saving to database:', dbError);
     }
     
     // Store the latest scan
     lastBarcodeScan = scanRecord;
     
-    console.log(`ESP32 barcode scan received from ${device.deviceName}: ${barcodeData}`);
+    console.log('📡 Broadcasting scan to WebSocket clients...');
+    console.log('Scan record:', JSON.stringify(scanRecord, null, 2));
+    console.log('🔍 WebSocket connected clients:', io.engine.clientsCount);
     
-    // Notify all connected clients about new scan
+    // Notify all connected clients about new scan with AI analysis
     io.emit('esp32_barcode_scan', scanRecord);
-    
-    // Mark as processed since ESP32 handles product lookup locally
-    scanRecord.processed = true;
-    scanRecord.productInfo = {
-      productName: productName || 'Unknown Product',
-      productType: productType || 'Unknown',
-      productDetails: productDetails || 'No details available',
-      foundInLocalDB: foundInLocalDB || false
-    };
-    
-    // Notify clients with ESP32 product information
     io.emit('esp32_scan_processed', scanRecord);
+    
+    console.log(`✅ Scan broadcast complete. Connected clients: ${io.engine.clientsCount}`);
     
     res.json({ 
       success: true, 
-      message: 'Barcode scan received',
-      scanId: scanRecord.id 
+      message: 'Barcode scan received and processed with AI',
+      scanId: scanRecord.id,
+      aiAnalysis: aiAnalysis
     });
   } catch (error) {
     console.error('Error processing ESP32 scan:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to process scan' 
+    });
+  }
+});
+
+// API endpoint to save barcode scan data
+app.post('/api/barcodes/save', async (req, res) => {
+  try {
+    const scanData = req.body;
+    
+    // Validate required fields
+    if (!scanData.barcodeData) {
+      return res.status(400).json({
+        success: false,
+        error: 'barcodeData is required'
+      });
+    }
+    
+    // Save to database using existing function
+    const result = await saveBarcodeScan(scanData);
+    
+    res.json({
+      success: true,
+      message: 'Barcode scan saved successfully',
+      data: result
+    });
+    
+  } catch (error) {
+    console.error('Error saving barcode scan:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save barcode scan'
     });
   }
 });
@@ -386,6 +471,43 @@ app.get('/api/barcodes/scanned', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to get scanned barcodes' 
+    });
+  }
+});
+
+// Delete a scanned barcode from history
+app.delete('/api/barcodes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log(`🗑️ Deleting barcode with ID: ${id}`);
+    
+    db.run('DELETE FROM barcodes WHERE id = ?', [id], function(err) {
+      if (err) {
+        console.error('❌ Error deleting barcode:', err);
+        res.status(500).json({ 
+          success: false, 
+          error: 'Failed to delete barcode' 
+        });
+      } else if (this.changes === 0) {
+        console.log('⚠️ No barcode found with ID:', id);
+        res.status(404).json({ 
+          success: false, 
+          error: 'Barcode not found' 
+        });
+      } else {
+        console.log('✅ Barcode deleted successfully');
+        res.json({ 
+          success: true, 
+          message: 'Barcode deleted successfully' 
+        });
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error deleting barcode:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to delete barcode' 
     });
   }
 });
@@ -571,6 +693,281 @@ async function callAIForProductAnalysis(barcode) {
   }
 }
 
+// Create saved_scans table if it doesn't exist
+const initSavedScansTable = () => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      CREATE TABLE IF NOT EXISTS saved_scans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        barcode_data TEXT NOT NULL,
+        barcode_type TEXT NOT NULL,
+        source TEXT NOT NULL,
+        product_name TEXT,
+        category TEXT,
+        price REAL,
+        description TEXT,
+        metadata TEXT,
+        saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+    
+    db.run(sql, (err) => {
+      if (err) {
+        console.error('❌ Error creating saved_scans table:', err);
+        reject(err);
+      } else {
+        console.log('✅ saved_scans table ready');
+        
+        // Verify the table was created
+        db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='saved_scans'", (err, row) => {
+          if (err) {
+            console.error('❌ Error verifying saved_scans table:', err);
+            reject(err);
+          } else if (row) {
+            console.log('✅ saved_scans table verified');
+            resolve();
+          } else {
+            console.error('❌ saved_scans table was not created');
+            reject(new Error('Table creation failed'));
+          }
+        });
+      }
+    });
+  });
+};
+
+// Save a scan to saved_scans table
+app.post('/api/save-scan', (req, res) => {
+  try {
+    const { barcode_data, barcode_type, source, product_name, category, price, description, metadata } = req.body;
+    
+    if (!barcode_data) {
+      return res.status(400).json({
+        success: false,
+        error: 'Barcode data is required'
+      });
+    }
+
+    // Only allow ESP32 source scans to be saved
+    const sourceUpper = (source || '').toUpperCase();
+    if (sourceUpper !== 'ESP32') {
+      return res.status(400).json({
+        success: false,
+        error: 'Only ESP32 source scans can be saved.'
+      });
+    }
+
+    // First, check if this barcode was already saved recently (within last 5 minutes)
+    const checkDuplicateSQL = `
+      SELECT id, saved_at FROM saved_scans 
+      WHERE barcode_data = ? 
+      ORDER BY saved_at DESC 
+      LIMIT 1
+    `;
+
+    db.get(checkDuplicateSQL, [barcode_data], (err, existingScan) => {
+      if (err) {
+        console.error('❌ Error checking for duplicates:', err);
+        console.error('   SQL:', checkDuplicateSQL);
+        console.error('   Barcode data:', barcode_data);
+        console.error('   Error message:', err.message);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to check for duplicates: ' + err.message
+        });
+      }
+
+      // If scan exists and was saved within last 5 minutes, prevent duplicate
+      if (existingScan) {
+        const now = new Date();
+        const savedTime = new Date(existingScan.saved_at);
+        const timeDiff = (now - savedTime) / 1000 / 60; // minutes
+
+        if (timeDiff < 5) {
+          console.log(`⚠️ Duplicate save prevented for barcode: ${barcode_data} (saved ${timeDiff.toFixed(1)} minutes ago)`);
+          return res.json({
+            success: false,
+            error: `This barcode was already saved ${timeDiff.toFixed(1)} minutes ago. Please wait before saving again.`,
+            duplicate: true,
+            lastSaved: existingScan.saved_at
+          });
+        }
+      }
+
+      // Save the scan if no recent duplicate found
+      const sql = `
+        INSERT INTO saved_scans (barcode_data, barcode_type, source, product_name, category, price, description, metadata)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      db.run(sql, [
+        barcode_data, 
+        barcode_type, 
+        source, 
+        product_name, 
+        category, 
+        price, 
+        description,
+        JSON.stringify(metadata)
+      ], function(err) {
+        if (err) {
+          console.error('Error saving scan:', err);
+          res.status(500).json({
+            success: false,
+            error: 'Failed to save scan'
+          });
+        } else {
+          console.log(`✅ Scan saved to saved_scans table. ID: ${this.lastID}`);
+          res.json({
+            success: true,
+            message: 'Scan saved successfully',
+            savedId: this.lastID
+          });
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error saving scan:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save scan'
+    });
+  }
+});
+
+// Get saved scans endpoint
+app.get('/api/saved-scans', (req, res) => {
+  try {
+    const sql = `
+      SELECT 
+        id, barcode_data, barcode_type, source, 
+        product_name, category, price, description, metadata, saved_at
+      FROM saved_scans 
+      ORDER BY saved_at DESC
+    `;
+    
+    db.all(sql, [], (err, rows) => {
+      if (err) {
+        console.error('Error fetching saved scans:', err);
+        res.status(500).json({ 
+          success: false, 
+          error: 'Failed to fetch saved scans' 
+        });
+      } else {
+        // Format rows to match expected structure
+        const formattedRows = rows.map(row => ({
+          ...row,
+          created_at: row.saved_at,
+          scanned_at: row.saved_at
+        }));
+        
+        res.json({ 
+          success: true, 
+          savedScans: formattedRows
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Error getting saved scans:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get saved scans' 
+    });
+  }
+});
+
+// Delete saved scan endpoint
+app.delete('/api/saved-scans/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const sql = `DELETE FROM saved_scans WHERE id = ?`;
+    
+    db.run(sql, [id], function(err) {
+      if (err) {
+        console.error('Error deleting saved scan:', err);
+        res.status(500).json({ 
+          success: false, 
+          error: 'Failed to delete saved scan' 
+        });
+      } else {
+        console.log(`🗑️ Deleted saved scan ID: ${id}`);
+        res.json({ 
+          success: true, 
+          message: 'Saved scan deleted successfully',
+          deletedId: id
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Error deleting saved scan:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to delete saved scan' 
+    });
+  }
+});
+
+// Clear ALL saved scans endpoint
+app.delete('/api/saved-scans', (req, res) => {
+  try {
+    const sql = `DELETE FROM saved_scans`;
+    
+    db.run(sql, [], function(err) {
+      if (err) {
+        console.error('Error clearing saved scans:', err);
+        res.status(500).json({ 
+          success: false, 
+          error: 'Failed to clear saved scans' 
+        });
+      } else {
+        console.log(`🗑️ Cleared all saved scans. ${this.changes} rows deleted.`);
+        res.json({ 
+          success: true, 
+          message: 'All saved scans cleared successfully',
+          deletedCount: this.changes
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Error clearing saved scans:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to clear saved scans' 
+    });
+  }
+});
+
+// Clear GM77_SCAN entries from saved scans
+app.delete('/api/saved-scans/gm77', (req, res) => {
+  try {
+    const sql = `DELETE FROM saved_scans WHERE barcode_type = 'GM77_SCAN'`;
+    
+    db.run(sql, [], function(err) {
+      if (err) {
+        console.error('Error clearing GM77_SCAN entries:', err);
+        res.status(500).json({ 
+          success: false, 
+          error: 'Failed to clear GM77_SCAN entries' 
+        });
+      } else {
+        console.log(`🗑️ Cleared ${this.changes} GM77_SCAN entries from saved scans.`);
+        res.json({ 
+          success: true, 
+          message: 'GM77_SCAN entries cleared successfully',
+          deletedCount: this.changes
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Error clearing GM77_SCAN entries:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to clear GM77_SCAN entries' 
+    });
+  }
+});
+
 // Get barcode statistics
 app.get('/api/barcodes/stats', (req, res) => {
   try {
@@ -725,7 +1122,7 @@ app.get('/api/backend-status', (req, res) => {
 // Check if Python backend is running on port 5000
 const checkPythonBackend = async () => {
   try {
-    const response = await fetch('http://localhost:5000/health', {
+    const response = await fetch(`${FLASK_SERVER_URL}/health`, {
       method: 'GET',
       signal: AbortSignal.timeout(2000)
     });
@@ -742,12 +1139,12 @@ app.post('/api/generate_barcode', async (req, res) => {
     if (!isBackendRunning) {
       return res.status(503).json({ 
         success: false, 
-        error: 'Python backend is not running on port 5000' 
+        error: `Python backend is not running at ${FLASK_SERVER_URL}` 
       });
     }
 
     // Forward request to Python backend
-    const response = await fetch('http://localhost:5000/generate_barcode', {
+    const response = await fetch(`${FLASK_SERVER_URL}/generate_barcode`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -772,12 +1169,12 @@ app.get('/api/get_barcode/:filename', async (req, res) => {
     if (!isBackendRunning) {
       return res.status(503).json({ 
         success: false, 
-        error: 'Python backend is not running on port 5000' 
+        error: `Python backend is not running at ${FLASK_SERVER_URL}` 
       });
     }
 
     // Forward request to Python backend
-    const response = await fetch(`http://localhost:5000/get_barcode/${req.params.filename}`);
+    const response = await fetch(`${FLASK_SERVER_URL}/get_barcode/${req.params.filename}`);
     
     if (response.ok) {
       const buffer = await response.arrayBuffer();
@@ -804,12 +1201,12 @@ app.get('/api/list_barcodes', async (req, res) => {
     if (!isBackendRunning) {
       return res.status(503).json({ 
         success: false, 
-        error: 'Python backend is not running on port 5000' 
+        error: `Python backend is not running at ${FLASK_SERVER_URL}` 
       });
     }
 
     // Forward request to Python backend
-    const response = await fetch('http://localhost:5000/list_barcodes');
+    const response = await fetch(`${FLASK_SERVER_URL}/list_barcodes`);
     const result = await response.json();
     res.json(result);
   } catch (error) {
@@ -833,7 +1230,7 @@ app.get('/api/racks', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const url = new URL('http://localhost:5000/api/racks');
+    const url = new URL(`${FLASK_SERVER_URL}/api/racks`);
     if (req.query.search) url.searchParams.append('search', req.query.search);
     if (req.query.status) url.searchParams.append('status', req.query.status);
     
@@ -860,7 +1257,7 @@ app.post('/api/racks', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch('http://localhost:5000/api/racks', {
+    const response = await fetch(`${FLASK_SERVER_URL}/api/racks`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -885,12 +1282,12 @@ app.put('/api/racks/:id', async (req, res) => {
     if (!isBackendRunning) {
       return res.status(503).json({ 
         success: false, 
-        error: 'Python backend is not running on port 5000' 
+        error: `Python backend is not running at ${FLASK_SERVER_URL}` 
       });
     }
 
     // Forward request to Python backend
-    const response = await fetch(`http://localhost:5000/api/racks/${req.params.id}`, {
+    const response = await fetch(`${FLASK_SERVER_URL}/api/racks/${req.params.id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -920,7 +1317,7 @@ app.delete('/api/racks/:id', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`http://localhost:5000/api/racks/${req.params.id}`, {
+    const response = await fetch(`${FLASK_SERVER_URL}/api/racks/${req.params.id}`, {
       method: 'DELETE'
     });
 
@@ -946,7 +1343,7 @@ app.get('/api/racks/stats', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch('http://localhost:5000/api/racks/stats');
+    const response = await fetch(`${FLASK_SERVER_URL}/api/racks/stats`);
     const result = await response.json();
     res.json(result);
   } catch (error) {
@@ -969,7 +1366,7 @@ app.get('/api/racks/search', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const url = new URL('http://localhost:5000/api/racks/search');
+    const url = new URL(`${FLASK_SERVER_URL}/api/racks/search`);
     if (req.query.q) url.searchParams.append('q', req.query.q);
     
     const response = await fetch(url.toString());
@@ -996,7 +1393,7 @@ app.post('/api/racks/:rackId/update-quantity', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`http://localhost:5000/api/racks/${req.params.rackId}/update-quantity`, {
+    const response = await fetch(`${FLASK_SERVER_URL}/api/racks/${req.params.rackId}/update-quantity`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1026,7 +1423,7 @@ app.get('/api/rack-status', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch('http://localhost:5000/api/rack-status');
+    const response = await fetch(`${FLASK_SERVER_URL}/api/rack-status`);
     const result = await response.json();
     res.json(result);
   } catch (error) {
@@ -1049,7 +1446,7 @@ app.post('/api/init-db', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch('http://localhost:5000/api/init-db', {
+    const response = await fetch(`${FLASK_SERVER_URL}/api/init-db`, {
       method: 'POST'
     });
     const result = await response.json();
@@ -1112,26 +1509,40 @@ const startServer = async () => {
     // Initialize database connection
     await initDatabase();
     console.log('✅ Database connection initialized');
+    
+    // Initialize saved_scans table
+    await initSavedScansTable();
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
     console.log('⚠️  Server will continue without database functionality');
   }
   
-  // Start both servers
-  server.listen(PORT, () => {
-    console.log(`Main server running on port ${PORT}`);
-    console.log(`Python backend control available at http://localhost:${PORT}/api/`);
-    console.log(`WebSocket server running on port ${PORT}`);
-    console.log(`Access the app at: http://localhost:${PORT}`);
+  // Start server
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('🚀 Robridge Backend Server Started');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log(`📡 Main server running on port ${PORT}`);
+    console.log(`🌍 Environment: ${NODE_ENV}`);
+    console.log(`🤖 AI Server: ${AI_SERVER_URL}`);
+    console.log(`🏷️  Flask Server: ${FLASK_SERVER_URL}`);
+    console.log(`🔌 WebSocket server active on port ${PORT}`);
+    console.log(`🗄️  Database: ${db ? 'Connected' : 'Not connected'}`);
+    if (NODE_ENV === 'production') {
+      console.log(`🌐 Production URL: https://robridge-express-production.up.railway.app`);
+    } else {
+      console.log(`🌐 Local URL: http://localhost:${PORT}`);
+    }
+    console.log('═══════════════════════════════════════════════════════');
   });
 };
 
 startServer();
 
-redirectApp.listen(REDIRECT_PORT, () => {
-  console.log(`Redirect server running on port ${REDIRECT_PORT}`);
-  console.log(`Redirecting all traffic to port ${PORT}`);
-  console.log(`You can access the app at either:`);
-  console.log(`  - http://localhost:${PORT} (recommended)`);
-  console.log(`  - http://localhost:${REDIRECT_PORT} (redirects to ${PORT})`);
-});
+// Only start redirect server in development
+if (NODE_ENV !== 'production') {
+  redirectApp.listen(REDIRECT_PORT, () => {
+    console.log(`Redirect server running on port ${REDIRECT_PORT}`);
+    console.log(`Redirecting all traffic to port ${PORT}`);
+  });
+}

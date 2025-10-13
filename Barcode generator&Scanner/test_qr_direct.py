@@ -12,7 +12,7 @@ def test_qr_generation():
     print("🧪 Testing QR code generation directly...")
     
     # Test data
-    test_data = "TEST123|Sample Product|Electronics|99.99|Warehouse A|Test description"
+    test_data = "Apple|Earpods|Electronics|99.99|Warehouse A|Test description"
     
     print(f"📤 Test data: {test_data}")
     
