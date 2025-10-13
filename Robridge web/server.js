@@ -231,7 +231,7 @@ app.post('/api/esp32/scan/:deviceId', async (req, res) => {
     // AI Server runs on port 8000!
     let aiAnalysis = null;
     try {
-      console.log(`🤖 Forwarding to AI server at ${${AI_SERVER_URL}} for barcode: ${barcodeData}`);
+      console.log(`🤖 Forwarding to AI server at ${AI_SERVER_URL} for barcode: ${barcodeData}`);
       
         const aiResponse = await fetch(`${AI_SERVER_URL}/api/esp32/scan`, {
         method: 'POST',
@@ -257,7 +257,7 @@ app.post('/api/esp32/scan/:deviceId', async (req, res) => {
       }
     } catch (aiError) {
       console.error('❌ AI server communication error:', aiError.message);
-      console.log(`ℹ️  Make sure AI server is running at: ${${AI_SERVER_URL}}`);
+      console.log(`ℹ️  Make sure AI server is running at: ${AI_SERVER_URL}`);
     }
     
     // Provide fallback if no AI analysis available
@@ -1139,7 +1139,7 @@ app.post('/api/generate_barcode', async (req, res) => {
     if (!isBackendRunning) {
       return res.status(503).json({ 
         success: false, 
-        error: `Python backend is not running at ${${FLASK_SERVER_URL}}` 
+        error: `Python backend is not running at ${FLASK_SERVER_URL}` 
       });
     }
 
@@ -1169,12 +1169,12 @@ app.get('/api/get_barcode/:filename', async (req, res) => {
     if (!isBackendRunning) {
       return res.status(503).json({ 
         success: false, 
-        error: `Python backend is not running at ${${FLASK_SERVER_URL}}` 
+        error: `Python backend is not running at ${FLASK_SERVER_URL}` 
       });
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${${FLASK_SERVER_URL}}/get_barcode/${req.params.filename}`);
+    const response = await fetch(`${FLASK_SERVER_URL}/get_barcode/${req.params.filename}`);
     
     if (response.ok) {
       const buffer = await response.arrayBuffer();
@@ -1201,12 +1201,12 @@ app.get('/api/list_barcodes', async (req, res) => {
     if (!isBackendRunning) {
       return res.status(503).json({ 
         success: false, 
-        error: `Python backend is not running at ${${FLASK_SERVER_URL}}` 
+        error: `Python backend is not running at ${FLASK_SERVER_URL}` 
       });
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${${FLASK_SERVER_URL}}/list_barcodes`);
+    const response = await fetch(`${FLASK_SERVER_URL}/list_barcodes`);
     const result = await response.json();
     res.json(result);
   } catch (error) {
@@ -1230,7 +1230,7 @@ app.get('/api/racks', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const url = new URL(`${${FLASK_SERVER_URL}}/api/racks`);
+    const url = new URL(`${FLASK_SERVER_URL}/api/racks`);
     if (req.query.search) url.searchParams.append('search', req.query.search);
     if (req.query.status) url.searchParams.append('status', req.query.status);
     
@@ -1257,7 +1257,7 @@ app.post('/api/racks', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${${FLASK_SERVER_URL}}/api/racks`, {
+    const response = await fetch(`${FLASK_SERVER_URL}/api/racks`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1282,12 +1282,12 @@ app.put('/api/racks/:id', async (req, res) => {
     if (!isBackendRunning) {
       return res.status(503).json({ 
         success: false, 
-        error: `Python backend is not running at ${${FLASK_SERVER_URL}}` 
+        error: `Python backend is not running at ${FLASK_SERVER_URL}` 
       });
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${${FLASK_SERVER_URL}}/api/racks/${req.params.id}`, {
+    const response = await fetch(`${FLASK_SERVER_URL}/api/racks/${req.params.id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -1317,7 +1317,7 @@ app.delete('/api/racks/:id', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${${FLASK_SERVER_URL}}/api/racks/${req.params.id}`, {
+    const response = await fetch(`${FLASK_SERVER_URL}/api/racks/${req.params.id}`, {
       method: 'DELETE'
     });
 
@@ -1343,7 +1343,7 @@ app.get('/api/racks/stats', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${${FLASK_SERVER_URL}}/api/racks/stats`);
+    const response = await fetch(`${FLASK_SERVER_URL}/api/racks/stats`);
     const result = await response.json();
     res.json(result);
   } catch (error) {
@@ -1366,7 +1366,7 @@ app.get('/api/racks/search', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const url = new URL(`${${FLASK_SERVER_URL}}/api/racks/search`);
+    const url = new URL(`${FLASK_SERVER_URL}/api/racks/search`);
     if (req.query.q) url.searchParams.append('q', req.query.q);
     
     const response = await fetch(url.toString());
@@ -1393,7 +1393,7 @@ app.post('/api/racks/:rackId/update-quantity', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${${FLASK_SERVER_URL}}/api/racks/${req.params.rackId}/update-quantity`, {
+    const response = await fetch(`${FLASK_SERVER_URL}/api/racks/${req.params.rackId}/update-quantity`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1423,7 +1423,7 @@ app.get('/api/rack-status', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${${FLASK_SERVER_URL}}/api/rack-status`);
+    const response = await fetch(`${FLASK_SERVER_URL}/api/rack-status`);
     const result = await response.json();
     res.json(result);
   } catch (error) {
@@ -1446,7 +1446,7 @@ app.post('/api/init-db', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${${FLASK_SERVER_URL}}/api/init-db`, {
+    const response = await fetch(`${FLASK_SERVER_URL}/api/init-db`, {
       method: 'POST'
     });
     const result = await response.json();
