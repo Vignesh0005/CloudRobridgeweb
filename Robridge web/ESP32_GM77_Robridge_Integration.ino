@@ -31,9 +31,8 @@ const char* ssid = "Thin";
 const char* password = "12345678";
 
 // --- Robridge Server Configuration ---
-const char* serverIP = "172.21.66.150"; // Replace with your computer's IP address
-const int serverPort = 3001;
-String baseURL = "http://" + String(serverIP) + ":" + String(serverPort);
+const char* expressServerURL = "https://robridge-express.onrender.com";  // Express backend
+const char* aiServerURL = "https://robridge-ai.onrender.com";  // AI server
 
 // --- ESP32 Device Configuration ---
 const String deviceId = "ESP32_GM77_SCANNER_001";
@@ -66,7 +65,7 @@ struct Product {
 
 // --- AI Model Configuration ---
 // Your trained AI model endpoint (from pipeline_config.json)
-const char* ai_model_url = "http://172.21.66.150:8000/generate"; // Your trained AI model endpoint
+const char* ai_model_url = "https://robridge-ai.onrender.com/api/esp32/scan"; // AI server endpoint
 
 // --- Status Variables ---
 bool wifiConnected = false;
@@ -269,7 +268,7 @@ Product lookupProductInDatabase(String scannedCode) {
   }
   
   HTTPClient http;
-  http.begin(baseURL + "/api/barcodes/lookup/" + scannedCode);
+  http.begin(String(expressServerURL) + "/api/barcodes/lookup/" + scannedCode);
   http.addHeader("Content-Type", "application/json");
   
   debugPrint("Looking up barcode in database: " + scannedCode);
@@ -320,12 +319,13 @@ Product analyzeProductWithAI(String scannedCode) {
   http.begin(ai_model_url);
   http.addHeader("Content-Type", "application/json");
   
-  // Create JSON payload matching the trained AI model API format
-  StaticJsonDocument<200> doc;
-  doc["barcode"] = scannedCode;
-  doc["max_length"] = 200;
-  doc["temperature"] = 0.7;
-  doc["top_p"] = 0.9;
+  // Create JSON payload matching the AI server API format
+  StaticJsonDocument<300> doc;
+  doc["barcodeData"] = scannedCode;
+  doc["deviceId"] = deviceId;
+  doc["deviceName"] = deviceName;
+  doc["scanType"] = "GM77_SCAN";
+  doc["timestamp"] = millis();
   
   String jsonString;
   serializeJson(doc, jsonString);
@@ -339,23 +339,26 @@ Product analyzeProductWithAI(String scannedCode) {
     debugPrint("Trained AI model response: " + response);
     
     if (httpResponseCode == 200) {
-      // Parse JSON response from trained AI model
+      // Parse JSON response from AI server
       DynamicJsonDocument responseDoc(2048);
       deserializeJson(responseDoc, response);
       
       if (responseDoc["success"]) {
-        String productDescription = responseDoc["product_description"].as<String>();
+        String title = responseDoc["title"].as<String>();
+        String category = responseDoc["category"].as<String>();
+        String description = responseDoc["description"].as<String>();
+        String country = responseDoc["country"].as<String>();
         
-        // Parse the AI-generated description to extract product info
-        product.name = "AI-Generated Product";
-        product.type = "Analyzed";
-        product.details = productDescription;
+        // Parse the AI-generated response to extract product info
+        product.name = title;
+        product.type = category;
+        product.details = description;
         product.price = "Price not available";
-        product.category = "AI Analyzed";
-        product.location = "AI Model";
+        product.category = category;
+        product.location = country;
         product.foundInDatabase = false; // This is AI-generated, not from database
         
-        debugPrint("Product analyzed by trained AI model: " + productDescription);
+        debugPrint("Product analyzed by AI server: " + title + " - " + category);
       }
     }
   } else {
@@ -376,12 +379,13 @@ String callAIBenefitsAnalysis(String barcodeData, String productName) {
   http.begin(ai_model_url);
   http.addHeader("Content-Type", "application/json");
   
-  // Create JSON payload for benefits analysis using trained AI model
+  // Create JSON payload for benefits analysis using AI server
   StaticJsonDocument<300> doc;
-  doc["barcode"] = barcodeData;
-  doc["max_length"] = 150; // Shorter for benefits
-  doc["temperature"] = 0.8; // Slightly higher for creativity
-  doc["top_p"] = 0.9;
+  doc["barcodeData"] = barcodeData;
+  doc["deviceId"] = deviceId;
+  doc["deviceName"] = deviceName;
+  doc["scanType"] = "BENEFITS_ANALYSIS";
+  doc["timestamp"] = millis();
   
   String jsonString;
   serializeJson(doc, jsonString);
@@ -395,13 +399,13 @@ String callAIBenefitsAnalysis(String barcodeData, String productName) {
     debugPrint("Trained AI benefits response: " + response);
     
     if (httpResponseCode == 200) {
-      // Parse JSON response from trained AI model
+      // Parse JSON response from AI server
       DynamicJsonDocument responseDoc(1024);
       deserializeJson(responseDoc, response);
       
       if (responseDoc["success"]) {
-        String productDescription = responseDoc["product_description"].as<String>();
-        return productDescription;
+        String description = responseDoc["description"].as<String>();
+        return description;
       }
     }
   }
@@ -496,7 +500,7 @@ void registerWithRobridge() {
   }
   
   HTTPClient http;
-  http.begin(baseURL + "/api/esp32/register");
+  http.begin(String(expressServerURL) + "/api/esp32/register");
   http.addHeader("Content-Type", "application/json");
   
   // Create JSON payload
@@ -538,7 +542,7 @@ void sendPingToRobridge() {
   }
   
   HTTPClient http;
-  http.begin(baseURL + "/api/esp32/ping/" + deviceId);
+  http.begin(String(expressServerURL) + "/api/esp32/ping/" + deviceId);
   http.addHeader("Content-Type", "application/json");
   
   int httpResponseCode = http.POST("{}");
@@ -567,7 +571,7 @@ void sendScanToRobridge(String barcodeData, Product* product = nullptr) {
   }
   
   HTTPClient http;
-  http.begin(baseURL + "/api/esp32/scan/" + deviceId);
+  http.begin(String(expressServerURL) + "/api/esp32/scan/" + deviceId);
   http.addHeader("Content-Type", "application/json");
   
   // Create JSON payload
