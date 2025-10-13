@@ -1,10 +1,10 @@
 services:
-  # Express.js Backend Server
+  # Express.js Backend Server (API Only)
   - type: web
     name: robridge-express
     env: node
     plan: free
-    buildCommand: cd "Robridge web" && npm install && npm run build
+    buildCommand: cd "Robridge web" && npm install
     startCommand: cd "Robridge web" && node server.js
     envVars:
       - key: NODE_ENV
