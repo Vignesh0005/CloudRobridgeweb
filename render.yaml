@@ -47,16 +47,3 @@ services:
         value: 10000
       - key: FLASK_ENV
         value: production
-
-  # PostgreSQL Database
-  - type: pserv
-    name: robridge-db
-    plan: free
-    runtime: postgresql
-    envVars:
-      - key: POSTGRES_DB
-        value: robridge_db
-      - key: POSTGRES_USER
-        value: robridge_user
-      - key: POSTGRES_PASSWORD
-        generateValue: true
