@@ -333,7 +333,7 @@ Product analyzeProductWithAI(String scannedCode) {
   debugPrint("Sending barcode to trained AI model: " + scannedCode);
   
   int httpResponseCode = http.POST(jsonString);
-  
+  ```````````
   if (httpResponseCode > 0) {
     String response = http.getString();
     debugPrint("Trained AI model response: " + response);
