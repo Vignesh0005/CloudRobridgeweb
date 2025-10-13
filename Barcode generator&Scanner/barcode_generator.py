@@ -1149,4 +1149,7 @@ if __name__ == '__main__':
     print("- GET /api/racks/search - Search racks")
     print("- GET /health - Health check")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Render-compatible port configuration
+    port = int(os.getenv("PORT", 5000))
+    debug = os.getenv("FLASK_ENV") != "production"
+    app.run(debug=debug, host='0.0.0.0', port=port)

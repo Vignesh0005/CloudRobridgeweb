@@ -1,0 +1,62 @@
+services:
+  # Express.js Backend Server
+  - type: web
+    name: robridge-express
+    env: node
+    plan: free
+    buildCommand: cd "Robridge web" && npm install && npm run build
+    startCommand: cd "Robridge web" && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: AI_SERVER_URL
+        fromService:
+          type: web
+          name: robridge-ai
+          property: host
+      - key: FLASK_SERVER_URL
+        fromService:
+          type: web
+          name: robridge-flask
+          property: host
+
+  # AI Analysis Server (FastAPI)
+  - type: web
+    name: robridge-ai
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: OPENAI_API_KEY
+        value: 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
+
+  # Flask Barcode Generator Server
+  - type: web
+    name: robridge-flask
+    env: python
+    plan: free
+    buildCommand: cd "Barcode generator&Scanner" && pip install -r requirements.txt
+    startCommand: cd "Barcode generator&Scanner" && python barcode_generator.py
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: FLASK_ENV
+        value: production
+
+  # PostgreSQL Database
+  - type: pserv
+    name: robridge-db
+    plan: free
+    env: postgresql
+    envVars:
+      - key: POSTGRES_DB
+        value: robridge_db
+      - key: POSTGRES_USER
+        value: robridge_user
+      - key: POSTGRES_PASSWORD
+        generateValue: true

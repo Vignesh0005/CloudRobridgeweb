@@ -492,12 +492,13 @@ async def scan_code(data: ScanInput):
 # Run Server
 # ======================
 if __name__ == "__main__":
-    # Changed to port 8000 to avoid conflict with barcode generator (port 5000)
+    # Render-compatible port configuration
+    port = int(os.getenv("PORT", 8000))
     print("=" * 60)
     print("🤖 Robridge AI Analysis Server Starting...")
     print("=" * 60)
-    print("📡 Server will run on: http://0.0.0.0:8000")
-    print("🔍 Health check: http://localhost:8000/health")
-    print("🧠 AI Analysis: http://localhost:8000/api/esp32/scan")
+    print(f"📡 Server will run on: http://0.0.0.0:{port}")
+    print(f"🔍 Health check: http://localhost:{port}/health")
+    print(f"🧠 AI Analysis: http://localhost:{port}/api/esp32/scan")
     print("=" * 60)
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)
