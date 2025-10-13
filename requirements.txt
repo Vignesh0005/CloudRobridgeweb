@@ -28,3 +28,7 @@ seaborn>=0.12.0
 # Utilities
 tqdm>=4.65.0
 requests>=2.31.0
+
+# OpenAI and HTTP
+openai>=1.0.0
+aiohttp>=3.8.0
