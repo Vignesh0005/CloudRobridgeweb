@@ -200,6 +200,40 @@ app.post('/api/esp32/ping/:deviceId', (req, res) => {
   }
 });
 
+// ESP32 Heartbeat/Ping (GET) - for easy testing
+app.get('/api/esp32/ping/:deviceId', (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const device = esp32Devices.get(deviceId);
+    
+    if (device) {
+      device.lastSeen = new Date().toISOString();
+      device.status = 'connected';
+      esp32Devices.set(deviceId, device);
+      
+      res.json({ success: true, timestamp: device.lastSeen, method: 'GET' });
+    } else {
+      // Device not registered, register it
+      const newDevice = {
+        deviceId,
+        deviceName: `ESP32-${deviceId}`,
+        lastSeen: new Date().toISOString(),
+        status: 'connected',
+        barcodeCount: 0
+      };
+      esp32Devices.set(deviceId, newDevice);
+      console.log(`📡 New ESP32 device registered (GET): ${deviceId}`);
+      res.json({ success: true, timestamp: newDevice.lastSeen, message: 'Device registered', method: 'GET' });
+    }
+  } catch (error) {
+    console.error('Error processing ESP32 ping (GET):', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to process ping' 
+    });
+  }
+});
+
 // ESP32 Barcode Scan Data - Enhanced with AI Integration
 app.post('/api/esp32/scan/:deviceId', async (req, res) => {
   try {
