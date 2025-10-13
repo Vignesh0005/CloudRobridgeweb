@@ -52,7 +52,7 @@ const RackManagement = () => {
 
   const checkConnection = async () => {
     try {
-      const response = await fetch(''https://robridge-express.onrender.com'/api/health');
+      const response = await fetch('https://robridge-express.onrender.com/api/health');
       if (response.ok) {
         setConnectionStatus('connected');
       } else {
@@ -129,7 +129,7 @@ const RackManagement = () => {
   const loadStats = async () => {
     try {
       console.log('Loading stats...');
-      const response = await fetch(''https://robridge-express.onrender.com'/api/racks/stats');
+      const response = await fetch('https://robridge-express.onrender.com/api/racks/stats');
       console.log('Stats response status:', response.status);
       
       if (!response.ok) {
@@ -183,7 +183,7 @@ const RackManagement = () => {
     setIsSaving(true);
     
     try {
-      const response = await fetch(''https://robridge-express.onrender.com'/api/racks', {
+      const response = await fetch('https://robridge-express.onrender.com/api/racks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -324,7 +324,7 @@ const RackManagement = () => {
     setIsInitializingDB(true);
     try {
       console.log('Initializing database...');
-      const response = await fetch(''https://robridge-express.onrender.com'/api/init-db', {
+      const response = await fetch('https://robridge-express.onrender.com/api/init-db', {
         method: 'POST'
       });
       

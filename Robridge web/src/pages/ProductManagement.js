@@ -44,7 +44,7 @@ const ProductManagement = () => {
 
   const loadAvailableRacks = async () => {
     try {
-      const response = await fetch(''https://robridge-express.onrender.com'/api/racks');
+      const response = await fetch('https://robridge-express.onrender.com/api/racks');
       const data = await response.json();
       
       if (data.success) {
