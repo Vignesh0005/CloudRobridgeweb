@@ -31,7 +31,10 @@ export const WebSocketProvider = ({ children }) => {
   // Function to auto-save scan data to database
   const autoSaveScanToDatabase = async (scanData) => {
     try {
-      const response = await fetch('http://localhost:3001/api/barcodes/save', {
+      const serverURL = process.env.NODE_ENV === 'production' 
+        ? 'https://robridge-express.onrender.com'
+        : 'http://localhost:3001';
+      const response = await fetch(`${serverURL}/api/barcodes/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -155,7 +158,11 @@ export const WebSocketProvider = ({ children }) => {
   useEffect(() => {
 
     // Create WebSocket connection
-    socketRef.current = io('http://localhost:3001', {
+    const serverURL = process.env.NODE_ENV === 'production' 
+      ? 'https://robridge-express.onrender.com'
+      : 'http://localhost:3001';
+    
+    socketRef.current = io(serverURL, {
       transports: ['websocket', 'polling'],
       timeout: 20000,
       forceNew: true
@@ -201,7 +208,10 @@ export const WebSocketProvider = ({ children }) => {
     // Fetch initial Device Connected devices
     const fetchEsp32Devices = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/esp32/devices');
+        const serverURL = process.env.NODE_ENV === 'production' 
+          ? 'https://robridge-express.onrender.com'
+          : 'http://localhost:3001';
+        const response = await fetch(`${serverURL}/api/esp32/devices`);
         const data = await response.json();
         if (data.success) {
           setEsp32Devices(data.devices);

@@ -17,7 +17,7 @@ const SavedScans = () => {
     setLoading(true);
     try {
       console.log('Fetching saved scans from API...');
-      const response = await fetch('http://localhost:3001/api/saved-scans');
+      const response = await fetch('process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/saved-scans');
       const data = await response.json();
       console.log('Saved scans API Response:', data);
       
@@ -83,7 +83,7 @@ const SavedScans = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/saved-scans/${scanId}`, {
+      const response = await fetch(`process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/saved-scans/${scanId}`, {
         method: 'DELETE',
       });
 
@@ -135,7 +135,7 @@ const SavedScans = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/saved-scans', {
+      const response = await fetch('process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/saved-scans', {
         method: 'DELETE',
       });
 

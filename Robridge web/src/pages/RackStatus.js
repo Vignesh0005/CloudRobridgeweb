@@ -36,7 +36,7 @@ const RackStatus = () => {
   const loadRackStatus = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('http://localhost:3001/api/rack-status');
+      const response = await fetch('process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/rack-status');
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

@@ -18,7 +18,10 @@ const BarcodeScanner = () => {
     try {
       // Only fetch ESP32 source types, exclude GM77_SCAN
       // Note: We'll fetch all and filter client-side since API only supports single source parameter
-      const response = await fetch('http://localhost:3001/api/barcodes/scanned?limit=100');
+      const serverURL = process.env.NODE_ENV === 'production' 
+        ? 'https://robridge-express.onrender.com'
+        : 'process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'';
+      const response = await fetch(`${serverURL}/api/barcodes/scanned?limit=100`);
       const data = await response.json();
       if (data.success) {
         console.log('📊 Total barcodes fetched:', data.barcodes.length);
@@ -95,7 +98,7 @@ const BarcodeScanner = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/save-scan', {
+      const response = await fetch('process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/save-scan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -152,7 +155,7 @@ const BarcodeScanner = () => {
         metadata = {};
       }
 
-      const response = await fetch('http://localhost:3001/api/save-scan', {
+      const response = await fetch('process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/save-scan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -200,7 +203,7 @@ const BarcodeScanner = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/barcodes/${barcode.id}`, {
+      const response = await fetch(`process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/barcodes/${barcode.id}`, {
         method: 'DELETE'
       });
 

@@ -52,7 +52,7 @@ const RackManagement = () => {
 
   const checkConnection = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/health');
+      const response = await fetch('process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/health');
       if (response.ok) {
         setConnectionStatus('connected');
       } else {
@@ -77,7 +77,7 @@ const RackManagement = () => {
       if (filterStatus !== 'all') params.append('status', filterStatus);
       
       console.log('Loading racks with params:', params.toString());
-      const response = await fetch(`http://localhost:3001/api/racks?${params.toString()}`);
+      const response = await fetch(`process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/racks?${params.toString()}`);
       console.log('Racks response status:', response.status);
       
       if (!response.ok) {
@@ -129,7 +129,7 @@ const RackManagement = () => {
   const loadStats = async () => {
     try {
       console.log('Loading stats...');
-      const response = await fetch('http://localhost:3001/api/racks/stats');
+      const response = await fetch('process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/racks/stats');
       console.log('Stats response status:', response.status);
       
       if (!response.ok) {
@@ -183,7 +183,7 @@ const RackManagement = () => {
     setIsSaving(true);
     
     try {
-      const response = await fetch('http://localhost:3001/api/racks', {
+      const response = await fetch('process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/racks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -229,7 +229,7 @@ const RackManagement = () => {
     setIsSaving(true);
     
     try {
-      const response = await fetch(`http://localhost:3001/api/racks/${editingRack.id}`, {
+      const response = await fetch(`process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/racks/${editingRack.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -259,7 +259,7 @@ const RackManagement = () => {
   const handleDeleteRack = async (rackId) => {
     if (window.confirm('Are you sure you want to delete this rack?')) {
       try {
-        const response = await fetch(`http://localhost:3001/api/racks/${rackId}`, {
+        const response = await fetch(`process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/racks/${rackId}`, {
           method: 'DELETE'
         });
         
@@ -294,7 +294,7 @@ const RackManagement = () => {
 
     setIsSearching(true);
     try {
-      const response = await fetch(`http://localhost:3001/api/racks/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      const response = await fetch(`process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/racks/search?q=${encodeURIComponent(searchQuery.trim())}`);
       const data = await response.json();
       
       if (data.success) {
@@ -324,7 +324,7 @@ const RackManagement = () => {
     setIsInitializingDB(true);
     try {
       console.log('Initializing database...');
-      const response = await fetch('http://localhost:3001/api/init-db', {
+      const response = await fetch('process.env.NODE_ENV === 'production' ? 'https://robridge-express.onrender.com' : 'http://localhost:3001'/api/init-db', {
         method: 'POST'
       });
       
