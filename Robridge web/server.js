@@ -15,17 +15,7 @@ const io = socketIo(server, {
   }
 });
 
-// Railway-compatible configuration
-const PORT = process.env.PORT || 3001;
-const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000';
-const FLASK_SERVER_URL = process.env.FLASK_SERVER_URL || 'http://localhost:5000';
-const NODE_ENV = process.env.NODE_ENV || 'development';
-
-console.log('🚀 Server Configuration:');
-console.log(`   PORT: ${PORT}`);
-console.log(`   AI_SERVER_URL: ${AI_SERVER_URL}`);
-console.log(`   FLASK_SERVER_URL: ${FLASK_SERVER_URL}`);
-console.log(`   NODE_ENV: ${NODE_ENV}`);
+const PORT = 3001;
 
 // Create a separate app for port 3002 redirect
 const redirectApp = express();
@@ -231,9 +221,9 @@ app.post('/api/esp32/scan/:deviceId', async (req, res) => {
     // AI Server runs on port 8000!
     let aiAnalysis = null;
     try {
-      console.log(`🤖 Forwarding to AI server at ${AI_SERVER_URL} for barcode: ${barcodeData}`);
+      console.log(`🤖 Forwarding to AI server at ${http://localhost:8000} for barcode: ${barcodeData}`);
       
-      const aiResponse = await fetch(`${AI_SERVER_URL}/api/esp32/scan`, {
+        const aiResponse = await fetch(`http://localhost:8000/api/esp32/scan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -257,7 +247,7 @@ app.post('/api/esp32/scan/:deviceId', async (req, res) => {
       }
     } catch (aiError) {
       console.error('❌ AI server communication error:', aiError.message);
-      console.log(`ℹ️  Make sure AI server is running at: ${AI_SERVER_URL}`);
+      console.log(`ℹ️  Make sure AI server is running at: ${http://localhost:8000}`);
     }
     
     // Provide fallback if no AI analysis available
@@ -1122,7 +1112,7 @@ app.get('/api/backend-status', (req, res) => {
 // Check if Python backend is running on port 5000
 const checkPythonBackend = async () => {
   try {
-    const response = await fetch(`${FLASK_SERVER_URL}/health`, {
+        const response = await fetch(`http://localhost:5000/health`, {
       method: 'GET',
       signal: AbortSignal.timeout(2000)
     });
@@ -1139,12 +1129,12 @@ app.post('/api/generate_barcode', async (req, res) => {
     if (!isBackendRunning) {
       return res.status(503).json({ 
         success: false, 
-        error: `Python backend is not running at ${FLASK_SERVER_URL}` 
+        error: `Python backend is not running at ${http://localhost:5000}` 
       });
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${FLASK_SERVER_URL}/generate_barcode`, {
+        const response = await fetch(`http://localhost:5000/generate_barcode`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1169,12 +1159,12 @@ app.get('/api/get_barcode/:filename', async (req, res) => {
     if (!isBackendRunning) {
       return res.status(503).json({ 
         success: false, 
-        error: `Python backend is not running at ${FLASK_SERVER_URL}` 
+        error: `Python backend is not running at ${http://localhost:5000}` 
       });
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${FLASK_SERVER_URL}/get_barcode/${req.params.filename}`);
+    const response = await fetch(`${http://localhost:5000}/get_barcode/${req.params.filename}`);
     
     if (response.ok) {
       const buffer = await response.arrayBuffer();
@@ -1201,12 +1191,12 @@ app.get('/api/list_barcodes', async (req, res) => {
     if (!isBackendRunning) {
       return res.status(503).json({ 
         success: false, 
-        error: `Python backend is not running at ${FLASK_SERVER_URL}` 
+        error: `Python backend is not running at ${http://localhost:5000}` 
       });
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${FLASK_SERVER_URL}/list_barcodes`);
+    const response = await fetch(`${http://localhost:5000}/list_barcodes`);
     const result = await response.json();
     res.json(result);
   } catch (error) {
@@ -1230,7 +1220,7 @@ app.get('/api/racks', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const url = new URL(`${FLASK_SERVER_URL}/api/racks`);
+    const url = new URL(`${http://localhost:5000}/api/racks`);
     if (req.query.search) url.searchParams.append('search', req.query.search);
     if (req.query.status) url.searchParams.append('status', req.query.status);
     
@@ -1257,7 +1247,7 @@ app.post('/api/racks', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${FLASK_SERVER_URL}/api/racks`, {
+    const response = await fetch(`${http://localhost:5000}/api/racks`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1282,12 +1272,12 @@ app.put('/api/racks/:id', async (req, res) => {
     if (!isBackendRunning) {
       return res.status(503).json({ 
         success: false, 
-        error: `Python backend is not running at ${FLASK_SERVER_URL}` 
+        error: `Python backend is not running at ${http://localhost:5000}` 
       });
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${FLASK_SERVER_URL}/api/racks/${req.params.id}`, {
+    const response = await fetch(`${http://localhost:5000}/api/racks/${req.params.id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -1317,7 +1307,7 @@ app.delete('/api/racks/:id', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${FLASK_SERVER_URL}/api/racks/${req.params.id}`, {
+    const response = await fetch(`${http://localhost:5000}/api/racks/${req.params.id}`, {
       method: 'DELETE'
     });
 
@@ -1343,7 +1333,7 @@ app.get('/api/racks/stats', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${FLASK_SERVER_URL}/api/racks/stats`);
+    const response = await fetch(`${http://localhost:5000}/api/racks/stats`);
     const result = await response.json();
     res.json(result);
   } catch (error) {
@@ -1366,7 +1356,7 @@ app.get('/api/racks/search', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const url = new URL(`${FLASK_SERVER_URL}/api/racks/search`);
+    const url = new URL(`${http://localhost:5000}/api/racks/search`);
     if (req.query.q) url.searchParams.append('q', req.query.q);
     
     const response = await fetch(url.toString());
@@ -1393,7 +1383,7 @@ app.post('/api/racks/:rackId/update-quantity', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${FLASK_SERVER_URL}/api/racks/${req.params.rackId}/update-quantity`, {
+    const response = await fetch(`${http://localhost:5000}/api/racks/${req.params.rackId}/update-quantity`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1423,7 +1413,7 @@ app.get('/api/rack-status', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${FLASK_SERVER_URL}/api/rack-status`);
+    const response = await fetch(`${http://localhost:5000}/api/rack-status`);
     const result = await response.json();
     res.json(result);
   } catch (error) {
@@ -1446,7 +1436,7 @@ app.post('/api/init-db', async (req, res) => {
     }
 
     // Forward request to Python backend
-    const response = await fetch(`${FLASK_SERVER_URL}/api/init-db`, {
+    const response = await fetch(`${http://localhost:5000}/api/init-db`, {
       method: 'POST'
     });
     const result = await response.json();
@@ -1523,26 +1513,20 @@ const startServer = async () => {
     console.log('🚀 Robridge Backend Server Started');
     console.log('═══════════════════════════════════════════════════════');
     console.log(`📡 Main server running on port ${PORT}`);
-    console.log(`🌍 Environment: ${NODE_ENV}`);
-    console.log(`🤖 AI Server: ${AI_SERVER_URL}`);
-    console.log(`🏷️  Flask Server: ${FLASK_SERVER_URL}`);
+    console.log(`🌍 Environment: development`);
+    console.log(`🤖 AI Server: http://localhost:8000`);
+    console.log(`🏷️  Flask Server: http://localhost:5000`);
     console.log(`🔌 WebSocket server active on port ${PORT}`);
     console.log(`🗄️  Database: ${db ? 'Connected' : 'Not connected'}`);
-    if (NODE_ENV === 'production') {
-      console.log(`🌐 Production URL: https://robridge-express-production.up.railway.app`);
-    } else {
-      console.log(`🌐 Local URL: http://localhost:${PORT}`);
-    }
+  console.log(`🌐 Local URL: http://localhost:${PORT}`);
     console.log('═══════════════════════════════════════════════════════');
   });
 };
 
 startServer();
 
-// Only start redirect server in development
-if (NODE_ENV !== 'production') {
-  redirectApp.listen(REDIRECT_PORT, () => {
-    console.log(`Redirect server running on port ${REDIRECT_PORT}`);
-    console.log(`Redirecting all traffic to port ${PORT}`);
-  });
-}
+// Start redirect server
+redirectApp.listen(REDIRECT_PORT, () => {
+  console.log(`Redirect server running on port ${REDIRECT_PORT}`);
+  console.log(`Redirecting all traffic to port ${PORT}`);
+});
