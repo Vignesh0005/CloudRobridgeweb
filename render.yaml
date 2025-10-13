@@ -52,7 +52,7 @@ services:
   - type: pserv
     name: robridge-db
     plan: free
-    env: postgresql
+    runtime: postgresql
     envVars:
       - key: POSTGRES_DB
         value: robridge_db
