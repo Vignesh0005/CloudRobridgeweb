@@ -234,6 +234,34 @@ app.get('/api/esp32/ping/:deviceId', (req, res) => {
   }
 });
 
+// ESP32 Scan Endpoint Info (GET) - for testing and documentation
+app.get('/api/esp32/scan', (req, res) => {
+  res.json({
+    message: 'ESP32 Barcode Scan Endpoint',
+    method: 'POST',
+    url: '/api/esp32/scan/:deviceId',
+    description: 'Send barcode scan data from ESP32 device',
+    requiredParams: {
+      deviceId: 'Device identifier (in URL path)'
+    },
+    requiredBody: {
+      barcodeData: 'The scanned barcode or QR code data',
+      scanType: 'Type of scan (optional)',
+      imageData: 'Base64 image data (optional)',
+      timestamp: 'Scan timestamp (optional)'
+    },
+    example: {
+      url: '/api/esp32/scan/my-device-001',
+      method: 'POST',
+      body: {
+        barcodeData: '1234567890123',
+        scanType: 'barcode',
+        timestamp: Date.now()
+      }
+    }
+  });
+});
+
 // ESP32 Barcode Scan Data - Enhanced with AI Integration
 app.post('/api/esp32/scan/:deviceId', async (req, res) => {
   try {
