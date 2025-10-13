@@ -32,7 +32,7 @@ const REDIRECT_PORT = 3003;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('build')); // Serve React build files
+// No static file serving - backend API only
 
 // Store the Python process
 let pythonProcess = null;
@@ -1458,22 +1458,20 @@ app.post('/api/init-db', async (req, res) => {
   }
 });
 
-// Serve React app for all other routes (only if build exists)
-app.get('*', (req, res) => {
-  const buildPath = path.join(__dirname, 'build', 'index.html');
-  if (require('fs').existsSync(buildPath)) {
-    res.sendFile(buildPath);
-  } else {
-    res.json({ 
-      message: 'React build not found. Run "npm run build" first, or use ${NODE_ENV} mode.',
-      endpoints: {
-        health: '/api/health',
-        startBackend: '/api/start-backend',
-        stopBackend: '/api/stop-backend',
-        backendStatus: '/api/backend-status'
-      }
-    });
-  }
+// Backend API only - serve API info for root route
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Robridge Backend API Server',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      esp32Ping: '/api/esp32/ping/:deviceId',
+      esp32Scan: '/api/esp32/scan',
+      startBackend: '/api/start-backend',
+      stopBackend: '/api/stop-backend',
+      backendStatus: '/api/backend-status'
+    }
+  });
 });
 
 // Redirect app setup for port 3000
