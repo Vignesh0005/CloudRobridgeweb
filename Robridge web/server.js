@@ -137,6 +137,11 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Simple health endpoint for convenience
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // ESP32 Device Registration
 app.post('/api/esp32/register', (req, res) => {
   try {
@@ -293,7 +298,7 @@ app.post('/api/esp32/scan/:deviceId', async (req, res) => {
     try {
       console.log(`🤖 Forwarding to AI server at ${AI_SERVER_URL} for barcode: ${barcodeData}`);
       
-        const aiResponse = await fetch(`${AI_SERVER_URL}/api/esp32/scan`, {
+        const aiResponse = await fetch(`${AI_SERVER_URL}/scan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

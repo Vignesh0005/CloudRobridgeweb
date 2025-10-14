@@ -24,15 +24,17 @@
 #include <Adafruit_SH110X.h>   // Use SH1106/SH1107 driver
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <NetworkClientSecure.h>
 #include <ArduinoJson.h>
 
 // --- WiFi Configuration ---
-const char* ssid = "Thin";
-const char* password = "12345678";
+const char* ssid = "Barista";
+const char* password = "q7rfdrg4";
 
 // --- Robridge Server Configuration ---
 const char* expressServerURL = "https://robridge-express.onrender.com";  // Express backend
-const char* aiServerURL = "https://robridge-ai.onrender.com";  // AI server
+const char* aiServerURL = "https://robridge-ai.onrender.com";  // AI server - Render hosted
 
 // --- ESP32 Device Configuration ---
 const String deviceId = "ESP32_GM77_SCANNER_001";
@@ -51,7 +53,7 @@ Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);  // for SH1106
 // --- GM77 Barcode Scanner on Serial2 ---
 HardwareSerial GM77(2); // UART2 on ESP32 (GPIO16 RX, GPIO17 TX)
 
-// --- Product Structure for Database Integration ---
+// --- Product Structure ---
 struct Product {
     String barcode;
     String name;
@@ -60,12 +62,77 @@ struct Product {
     String price;
     String category;
     String location;
-    bool foundInDatabase;
 };
 
-// --- AI Model Configuration ---
-// Your trained AI model endpoint (from pipeline_config.json)
-const char* ai_model_url = "https://robridge-ai.onrender.com/api/esp32/scan"; // AI server endpoint
+
+// Robridge Logo bitmap data (Working Version)
+static const unsigned char PROGMEM epd_bitmap_ro_bridge[] = {
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x0f, 0xe0, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x00, 0x78, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x0f, 0xf8, 0x00, 0x00, 0xff, 0xf8, 0x00, 0x00, 0x78, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x0f, 0xfc, 0x00, 0x00, 0xff, 0x3c, 0x00, 0x00, 0x78, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x0f, 0xbe, 0x00, 0x00, 0xff, 0x3e, 0x00, 0x00, 0x78, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x0f, 0xbe, 0x00, 0x00, 0xfe, 0x1e, 0x00, 0x00, 0x30, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x0f, 0x9f, 0x00, 0x00, 0xfe, 0x1e, 0x00, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x0f, 0x9f, 0x00, 0x00, 0x06, 0x3f, 0x00, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x0f, 0x1f, 0x00, 0x00, 0x06, 0x3f, 0x00, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x0f, 0x1f, 0x80, 0x00, 0xfe, 0xff, 0x00, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x0e, 0x0f, 0x80, 0x00, 0xfc, 0xff, 0x00, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x0e, 0x0f, 0x80, 0x00, 0xfd, 0xff, 0x00, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x0e, 0x0f, 0x80, 0xf0, 0x01, 0xff, 0x06, 0x00, 0x70, 0x07, 0x0e, 0x00, 0x60, 0x00, 0x1c, 0x00, 
+	0x0e, 0x07, 0x83, 0xfc, 0x03, 0xff, 0x07, 0x3c, 0x70, 0x1f, 0xce, 0x01, 0xf9, 0xc0, 0x7f, 0x00, 
+	0x0e, 0x0f, 0x83, 0xfc, 0x7f, 0xff, 0x07, 0x7c, 0x70, 0x1f, 0xce, 0x03, 0xf9, 0xc0, 0x7f, 0x80, 
+	0x0e, 0x8f, 0x87, 0xfe, 0x7f, 0xff, 0x07, 0x78, 0x70, 0x3f, 0xee, 0x07, 0xfd, 0xc0, 0xff, 0xc0, 
+	0x0f, 0x2f, 0x8f, 0xff, 0x7f, 0xff, 0x07, 0xf8, 0x70, 0x3c, 0xfe, 0x07, 0x9d, 0xc1, 0xe3, 0xc0, 
+	0x0f, 0xff, 0x0f, 0x0f, 0x3f, 0x9f, 0x07, 0xf8, 0x70, 0x78, 0x3e, 0x0f, 0x07, 0xc1, 0xc1, 0xe0, 
+	0x0e, 0x0f, 0x1e, 0x07, 0x3f, 0x8e, 0x07, 0xc0, 0x70, 0x70, 0x1e, 0x0e, 0x07, 0xc3, 0x80, 0xe0, 
+	0x0e, 0x0f, 0x1e, 0x07, 0xbf, 0x8e, 0x07, 0xc0, 0x70, 0x70, 0x1e, 0x1e, 0x03, 0xc3, 0x80, 0xe0, 
+	0x0f, 0x0f, 0x1c, 0x03, 0x9f, 0x04, 0x07, 0x80, 0x70, 0xe0, 0x1e, 0x1c, 0x03, 0xc3, 0x80, 0x60, 
+	0x0f, 0x1e, 0x1c, 0x03, 0x80, 0x06, 0x07, 0x00, 0x70, 0xe0, 0x0e, 0x1c, 0x01, 0xc3, 0x00, 0x70, 
+	0x0f, 0x1e, 0x3c, 0x03, 0x9f, 0x0f, 0x07, 0x00, 0x70, 0xe0, 0x0e, 0x1c, 0x01, 0xc7, 0x00, 0x70, 
+	0x0f, 0xfc, 0x38, 0x01, 0xdf, 0x8f, 0x07, 0x00, 0x70, 0xe0, 0x0e, 0x18, 0x01, 0xc7, 0x00, 0x70, 
+	0x0f, 0x1c, 0x38, 0x01, 0xdf, 0x8f, 0x07, 0x00, 0x70, 0xe0, 0x0e, 0x18, 0x01, 0xc7, 0x00, 0x70, 
+	0x0f, 0x9c, 0x38, 0x01, 0xdf, 0xff, 0x87, 0x00, 0x70, 0xe0, 0x0e, 0x18, 0x01, 0xc7, 0xff, 0xf0, 
+	0x0f, 0x9c, 0x38, 0x01, 0xdf, 0xff, 0x87, 0x00, 0x70, 0xe0, 0x0e, 0x18, 0x01, 0xc7, 0xff, 0xf0, 
+	0x0f, 0x9c, 0x38, 0x01, 0xdf, 0xff, 0x87, 0x00, 0x70, 0xe0, 0x0e, 0x18, 0x01, 0xc7, 0xff, 0xf0, 
+	0x0f, 0x9c, 0x38, 0x01, 0xdf, 0xff, 0x87, 0x00, 0x70, 0xe0, 0x0e, 0x18, 0x01, 0xc7, 0x00, 0x00, 
+	0x0f, 0x9e, 0x38, 0x01, 0x83, 0xff, 0x87, 0x00, 0x70, 0xe0, 0x0e, 0x1c, 0x01, 0xc7, 0x00, 0x00, 
+	0x0f, 0x9e, 0x3c, 0x03, 0x81, 0xff, 0x87, 0x00, 0x70, 0xe0, 0x0e, 0x1c, 0x01, 0xc7, 0x00, 0x00, 
+	0x0f, 0x9e, 0x1c, 0x03, 0x9c, 0xff, 0x87, 0x00, 0x70, 0xe0, 0x0e, 0x1c, 0x01, 0xc3, 0x00, 0x00, 
+	0x0f, 0x9e, 0x1c, 0x03, 0x9e, 0xff, 0x87, 0x00, 0x70, 0xe0, 0x1e, 0x1c, 0x03, 0xc3, 0x80, 0x60, 
+	0x0f, 0xbe, 0x1e, 0x07, 0xbe, 0x3f, 0x87, 0x00, 0x70, 0x70, 0x1e, 0x0e, 0x03, 0xc3, 0x80, 0xe0, 
+	0x0f, 0xbf, 0x1e, 0x07, 0x26, 0x3f, 0x07, 0x00, 0x70, 0x70, 0x1e, 0x0e, 0x07, 0xc3, 0xc0, 0xe0, 
+	0x0f, 0x9f, 0x0f, 0x0f, 0x06, 0x1f, 0x07, 0x00, 0x70, 0x78, 0x3e, 0x0f, 0x07, 0xc1, 0xc1, 0xe0, 
+	0x0f, 0x9f, 0x0f, 0xff, 0x06, 0x1f, 0x07, 0x00, 0x70, 0x3c, 0x6e, 0x07, 0x9d, 0xc1, 0xf7, 0xc0, 
+	0x0f, 0x9f, 0x07, 0xfe, 0x06, 0x3e, 0x07, 0x00, 0x70, 0x3f, 0xee, 0x07, 0xfd, 0xc0, 0xff, 0x80, 
+	0x0f, 0x9f, 0x83, 0xfc, 0xc7, 0x3e, 0x07, 0x00, 0x70, 0x1f, 0xce, 0x03, 0xf9, 0xc0, 0xff, 0x80, 
+	0x0f, 0x9f, 0x83, 0xf8, 0xe7, 0xfc, 0x07, 0x00, 0x70, 0x0f, 0xce, 0x01, 0xf1, 0xc0, 0x3f, 0x00, 
+	0x00, 0x00, 0x00, 0xf0, 0xef, 0xe0, 0x06, 0x00, 0x00, 0x07, 0x00, 0x00, 0x41, 0xc0, 0x1c, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xc0, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x80, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x80, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c, 0x03, 0x80, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0e, 0x03, 0x80, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0e, 0x07, 0x80, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x0f, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0xff, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0xfe, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xfc, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xfc, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
 
 // --- Status Variables ---
 bool wifiConnected = false;
@@ -242,177 +309,395 @@ String cleanBarcode(String rawData) {
   Serial.println("Raw barcode data: '" + rawData + "'");
   Serial.println("Raw data length: " + String(rawData.length()));
   
-  // Remove all non-numeric characters and trim
-  String cleaned = "";
-  for (int i = 0; i < rawData.length(); i++) {
-    char c = rawData[i];
-    if (c >= '0' && c <= '9') {  // Keep only digits
-      cleaned += c;
+  // Trim whitespace and control characters
+  String cleaned = rawData;
+  cleaned.trim();
+  
+  // Remove common control characters that might be added by the scanner
+  cleaned.replace("\r", "");
+  cleaned.replace("\n", "");
+  cleaned.replace("\t", "");
+  
+  // Check if it's a URL (contains http:// or https://)
+  if (cleaned.indexOf("http://") >= 0 || cleaned.indexOf("https://") >= 0) {
+    Serial.println("Detected URL barcode, keeping as-is");
+    Serial.println("Cleaned URL: '" + cleaned + "'");
+    return cleaned;
+  }
+  
+  // Check if it's an alphanumeric barcode (contains letters)
+  bool hasLetters = false;
+  for (int i = 0; i < cleaned.length(); i++) {
+    char c = cleaned[i];
+    if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+      hasLetters = true;
+      break;
     }
   }
   
-  Serial.println("Cleaned barcode: '" + cleaned + "'");
-  Serial.println("Cleaned length: " + String(cleaned.length()));
-  return cleaned;
+  if (hasLetters) {
+    Serial.println("Detected alphanumeric barcode, keeping as-is");
+    Serial.println("Cleaned alphanumeric: '" + cleaned + "'");
+    return cleaned;
+  }
+  
+  // For numeric-only barcodes, keep only digits
+  String numericOnly = "";
+  for (int i = 0; i < cleaned.length(); i++) {
+    char c = cleaned[i];
+    if (c >= '0' && c <= '9') {  // Keep only digits
+      numericOnly += c;
+    }
+  }
+  
+  Serial.println("Detected numeric barcode, cleaned: '" + numericOnly + "'");
+  Serial.println("Cleaned length: " + String(numericOnly.length()));
+  return numericOnly;
 }
 
-// Function to lookup product in SQL database
-Product lookupProductInDatabase(String scannedCode) {
-  Product product;
-  product.barcode = scannedCode;
-  product.foundInDatabase = false;
+
+// Function to manually wake up sleeping Render servers
+void wakeUpRenderServer(String serverURL) {
+  debugPrint("🔔 Attempting to wake up Render server...");
   
-  if (!wifiConnected) {
-    debugPrint("Cannot lookup product - WiFi not connected");
-    return product;
+  // Try simple HTTP GET to wake up the server
+  HTTPClient http;
+  String httpURL = serverURL;
+  if (httpURL.startsWith("https://")) {
+    httpURL = "http://" + httpURL.substring(8);
   }
   
-  HTTPClient http;
-  http.begin(String(expressServerURL) + "/api/barcodes/lookup/" + scannedCode);
-  http.addHeader("Content-Type", "application/json");
+  http.begin(httpURL + "/");
+  http.setTimeout(10000);
+  http.addHeader("User-Agent", "ESP32-WakeUp/1.0");
   
-  debugPrint("Looking up barcode in database: " + scannedCode);
+  int responseCode = http.GET();
+  debugPrint("Wake-up response: HTTP " + String(responseCode));
   
-  int httpResponseCode = http.GET();
-  
-  if (httpResponseCode > 0) {
+  if (responseCode > 0) {
     String response = http.getString();
-    debugPrint("Database lookup response: " + response);
-    
-    if (httpResponseCode == 200) {
-      // Parse JSON response
-      DynamicJsonDocument doc(1024);
-      deserializeJson(doc, response);
-      
-      if (doc["success"] && doc["product"]) {
-        product.name = doc["product"]["name"].as<String>();
-        product.type = doc["product"]["type"].as<String>();
-        product.details = doc["product"]["details"].as<String>();
-        product.price = doc["product"]["price"].as<String>();
-        product.category = doc["product"]["category"].as<String>();
-        product.location = doc["product"]["location"].as<String>();
-        product.foundInDatabase = true;
-        
-        debugPrint("Product found in database: " + product.name);
-      }
-    }
-  } else {
-    debugPrint("Database lookup failed. HTTP error: " + String(httpResponseCode));
+    debugPrint("Wake-up successful! Response: " + response.substring(0, min(50, (int)response.length())));
   }
   
   http.end();
-  return product;
+  delay(2000); // Give server time to fully wake up
 }
 
-// Function to analyze product using trained AI model
+// Function to test server connectivity with retry logic for Render sleep
+bool testServerConnection(String serverURL) {
+  // Try multiple times to handle Render free tier sleep
+  for (int attempt = 1; attempt <= 3; attempt++) {
+    debugPrint("=== Connection attempt " + String(attempt) + "/3 ===");
+    
+    // First try HTTP (non-secure) to see if it's an SSL issue
+    HTTPClient http;
+    
+    // Try HTTP first (remove https:// and use http://)
+    String httpURL = serverURL;
+    if (httpURL.startsWith("https://")) {
+      httpURL = "http://" + httpURL.substring(8);
+    }
+    
+    debugPrint("Testing HTTP connection to: " + httpURL);
+    
+    // Try different endpoints
+    String endpoints[] = {"/api/health", "/api/esp32/scan", "/health", "/"};
+    
+    for (int i = 0; i < 4; i++) {
+      String testURL = httpURL + endpoints[i];
+      debugPrint("Testing HTTP endpoint: " + testURL);
+      
+      http.begin(testURL);
+      http.setTimeout(15000); // Longer timeout for sleeping servers
+      http.addHeader("User-Agent", "ESP32-Test/1.0");
+      
+      int responseCode = http.GET();
+      debugPrint("HTTP Response from " + endpoints[i] + ": " + String(responseCode));
+      
+      if (responseCode > 0) {
+        String response = http.getString();
+        debugPrint("HTTP Response: " + response.substring(0, min(100, (int)response.length())));
+        http.end();
+        debugPrint("✅ Server is awake and responding!");
+        return true; // Found a working endpoint
+      }
+      
+      http.end();
+      delay(2000); // Wait between attempts
+    }
+    
+    // If HTTP fails, try HTTPS with proper SSL setup
+    debugPrint("HTTP failed, trying HTTPS with proper SSL setup...");
+    WiFiClientSecure client;
+    client.setInsecure(); // Skip certificate verification for Render.com
+    
+    for (int i = 0; i < 2; i++) { // Only try first 2 endpoints with HTTPS
+      String testURL = serverURL + endpoints[i];
+      debugPrint("Testing HTTPS endpoint: " + testURL);
+      
+      // Proper HTTPS setup
+      if (http.begin(client, testURL)) {
+        http.setTimeout(20000); // Longer timeout for HTTPS
+        http.addHeader("User-Agent", "ESP32-Test/1.0");
+        
+        int responseCode = http.GET();
+        debugPrint("HTTPS Response from " + endpoints[i] + ": " + String(responseCode));
+        
+        if (responseCode > 0) {
+          String response = http.getString();
+          debugPrint("HTTPS Response: " + response.substring(0, min(100, (int)response.length())));
+          http.end();
+          debugPrint("✅ HTTPS connection successful!");
+          return true;
+        }
+      } else {
+        debugPrint("Failed to begin HTTPS connection to " + testURL);
+      }
+      
+      http.end();
+      delay(2000);
+    }
+    
+    // If this attempt failed and we have more attempts, wait before retrying
+    if (attempt < 3) {
+      debugPrint("⚠️ Attempt " + String(attempt) + " failed. Waiting 5 seconds before retry...");
+      debugPrint("💤 Server might be sleeping. Trying to wake it up...");
+      delay(5000); // Wait 5 seconds between attempts
+    }
+  }
+  
+  debugPrint("❌ All connection attempts failed. Server may be down or DNS issue.");
+  return false;
+}
+
+// Function to analyze product using AI - Fixed Render.com connection
 Product analyzeProductWithAI(String scannedCode) {
   Product product;
   product.barcode = scannedCode;
-  product.foundInDatabase = false;
   
   if (!wifiConnected) {
     debugPrint("Cannot analyze product with AI - WiFi not connected");
+    product.name = "WiFi Error";
+    product.type = "Connection";
+    product.details = "WiFi not connected";
+    product.price = "N/A";
+    product.category = "Error";
+    product.location = "Unknown";
     return product;
   }
   
+  debugPrint("Scanned Code: " + scannedCode);
+  unsigned long analysisStartTime = millis();
+  const unsigned long maxAnalysisTime = 45000; // 45 second max timeout
+  
+  // Try multiple connection strategies for Render.com
   HTTPClient http;
-  http.begin(ai_model_url);
+  bool connectionSuccess = false;
+  String serverUrl = "";
+  
+  // Strategy 1: Try HTTP first (Render.com should redirect to HTTPS)
+  debugPrint("🔔 Strategy 1: Trying HTTP connection to wake up server...");
+  serverUrl = "http://robridge-express.onrender.com/api/esp32/scan/" + deviceId;
+  http.begin(serverUrl);
+  http.setTimeout(20000); // 20 second timeout for sleeping servers
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("User-Agent", "ESP32-Robridge/2.0");
   
-  // Create JSON payload matching the AI server API format
-  StaticJsonDocument<300> doc;
-  doc["barcodeData"] = scannedCode;
-  doc["deviceId"] = deviceId;
-  doc["deviceName"] = deviceName;
-  doc["scanType"] = "GM77_SCAN";
-  doc["timestamp"] = millis();
+  String payload = "{\"scanned_value\":\"" + scannedCode + "\"}";
+  debugPrint("Payload: " + payload);
   
-  String jsonString;
-  serializeJson(doc, jsonString);
+  int httpResponseCode = http.POST(payload);
+  debugPrint("HTTP Response Code: " + String(httpResponseCode));
   
-  debugPrint("Sending barcode to trained AI model: " + scannedCode);
+  if (httpResponseCode == 200) {
+    connectionSuccess = true;
+    debugPrint("✅ HTTP connection successful!");
+  } else if (httpResponseCode == 307 || httpResponseCode == 301 || httpResponseCode == 302) {
+    debugPrint("🔄 HTTP redirect detected (Code: " + String(httpResponseCode) + "), following redirect...");
+    http.end(); // Close HTTP connection before trying HTTPS
+    connectionSuccess = false; // Ensure we don't mark as successful yet
+  } else if (httpResponseCode > 0) {
+    connectionSuccess = true;
+    debugPrint("✅ HTTP connection successful!");
+  } else {
+    debugPrint("❌ HTTP failed: " + http.errorToString(httpResponseCode));
+    http.end();
+  }
   
-  int httpResponseCode = http.POST(jsonString);
-  ```````````
-  if (httpResponseCode > 0) {
-    String response = http.getString();
-    debugPrint("Trained AI model response: " + response);
+  // Strategy 2: Try HTTPS if HTTP didn't work or was redirected
+  if (!connectionSuccess && (httpResponseCode == 307 || httpResponseCode == 301 || httpResponseCode == 302 || httpResponseCode <= 0)) {
+    debugPrint("🔔 Strategy 2: Trying HTTPS with SSL setup...");
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure(); // Skip certificate verification for Render.com
+    secureClient.setTimeout(15000); // Reduced timeout to 15 seconds
     
-    if (httpResponseCode == 200) {
-      // Parse JSON response from AI server
-      DynamicJsonDocument responseDoc(2048);
-      deserializeJson(responseDoc, response);
+    serverUrl = "https://robridge-express.onrender.com/api/esp32/scan/" + deviceId;
+    debugPrint("Attempting HTTPS connection to: " + serverUrl);
+    
+    if (http.begin(secureClient, serverUrl)) {
+      debugPrint("✅ HTTPS connection initiated");
+      http.setTimeout(15000); // 15 second timeout
+      http.addHeader("Content-Type", "application/json");
+      http.addHeader("User-Agent", "ESP32-Robridge/2.0");
       
-      if (responseDoc["success"]) {
-        String title = responseDoc["title"].as<String>();
-        String category = responseDoc["category"].as<String>();
-        String description = responseDoc["description"].as<String>();
-        String country = responseDoc["country"].as<String>();
+      debugPrint("HTTPS Payload: " + payload);
+      
+      // Check timeout before making request
+      if (millis() - analysisStartTime > maxAnalysisTime) {
+        debugPrint("⏰ Analysis timeout reached, aborting HTTPS attempt");
+        http.end();
+        httpResponseCode = -1;
+        connectionSuccess = false;
+      } else {
+        debugPrint("Sending HTTPS POST request...");
+        httpResponseCode = http.POST(payload);
+        debugPrint("HTTPS Response Code: " + String(httpResponseCode));
+      }
+    } else {
+      debugPrint("❌ Failed to begin HTTPS connection");
+      httpResponseCode = -1;
+    }
+    
+    if (httpResponseCode > 0) {
+      connectionSuccess = true;
+      debugPrint("✅ HTTPS connection successful!");
+    } else {
+      debugPrint("❌ HTTPS failed: " + http.errorToString(httpResponseCode));
+      http.end();
+      
+      // Strategy 3: Try alternative AI server
+      debugPrint("🔔 Strategy 3: Trying alternative AI server...");
+      serverUrl = "https://robridge-ai.onrender.com/scan";
+      http.begin(secureClient, serverUrl);
+      http.setTimeout(30000);
+      http.addHeader("Content-Type", "application/json");
+      http.addHeader("User-Agent", "ESP32-Robridge/2.0");
+      
+      debugPrint("Alternative Payload: " + payload);
+      httpResponseCode = http.POST(payload);
+      debugPrint("Alternative Response Code: " + String(httpResponseCode));
+      
+      if (httpResponseCode > 0) {
+        connectionSuccess = true;
+        debugPrint("✅ Alternative server connection successful!");
+      } else {
+        debugPrint("❌ All connection strategies failed");
+        http.end();
+      }
+    }
+  }
+  
+  if (connectionSuccess && httpResponseCode == 200) {
+    String response = http.getString();
+    debugPrint("Response: " + response);
+    
+    // Parse JSON response
+    StaticJsonDocument<1024> doc;
+    DeserializationError error = deserializeJson(doc, response);
+    
+    if (!error) {
+      // Check if response has aiAnalysis object (new format)
+      if (doc["aiAnalysis"]) {
+        String title = doc["aiAnalysis"]["title"] | "N/A";
+        String category = doc["aiAnalysis"]["category"] | "N/A";
+        String description = doc["aiAnalysis"]["description"] | "N/A";
+        bool isFallback = doc["aiAnalysis"]["fallback"] | false;
         
-        // Parse the AI-generated response to extract product info
+        debugPrint("✅ AI Analysis Success!");
+        if (isFallback) {
+          debugPrint("⚠️ Using fallback analysis (AI server unavailable)");
+        }
+        debugPrint("Title: " + title);
+        debugPrint("Category: " + category);
+        debugPrint("Description: " + description);
+        
+        // Fill product info for display
         product.name = title;
         product.type = category;
         product.details = description;
-        product.price = "Price not available";
+        product.price = "N/A";
         product.category = category;
-        product.location = country;
-        product.foundInDatabase = false; // This is AI-generated, not from database
+        product.location = "Unknown";
+      } else {
+        // Fallback to old format
+        String title = doc["title"] | "N/A";
+        String category = doc["category"] | "N/A";
+        String description = doc["description"] | "N/A";
         
-        debugPrint("Product analyzed by AI server: " + title + " - " + category);
+        debugPrint("✅ AI Analysis Success!");
+        debugPrint("Title: " + title);
+        debugPrint("Category: " + category);
+        debugPrint("Description: " + description);
+        
+        // Fill product info for display
+        product.name = title;
+        product.type = category;
+        product.details = description;
+        product.price = "N/A";
+        product.category = category;
+        product.location = "Unknown";
       }
+      
+    } else {
+      debugPrint("❌ JSON parse failed: " + String(error.c_str()));
+      product.name = "Scanned Code: " + scannedCode;
+      product.type = "Parse Error";
+      product.details = "JSON parsing failed: " + String(error.c_str());
+      product.price = "N/A";
+      product.category = "Unknown";
+      product.location = "Unknown";
+    }
+  } else if (connectionSuccess) {
+    // Server responded but with error code
+    String response = http.getString();
+    debugPrint("Server Error Response: " + response);
+    debugPrint("Response length: " + String(response.length()));
+    
+    if (response.length() == 0) {
+      debugPrint("⚠️ Empty response - server might be redirecting or have an issue");
+      product.name = "Scanned Code: " + scannedCode;
+      product.type = "Redirect/Empty";
+      product.details = "Server returned empty response (HTTP " + String(httpResponseCode) + ")";
+      product.price = "N/A";
+      product.category = "Unknown";
+      product.location = "Unknown";
+    } else {
+      product.name = "Scanned Code: " + scannedCode;
+      product.type = "Server Error";
+      product.details = "HTTP " + String(httpResponseCode) + ": " + response;
+      product.price = "N/A";
+      product.category = "Unknown";
+      product.location = "Unknown";
     }
   } else {
-    debugPrint("Trained AI analysis failed. HTTP error: " + String(httpResponseCode));
+    // All connection attempts failed
+    product.name = "Scanned Code: " + scannedCode;
+    product.type = "Connection Failed";
+    product.details = "Cannot connect to AI servers. Check internet connection.";
+    product.price = "N/A";
+    product.category = "Unknown";
+    product.location = "Unknown";
   }
   
   http.end();
+  
+  // Final timeout check
+  unsigned long analysisTime = millis() - analysisStartTime;
+  debugPrint("Analysis completed in " + String(analysisTime) + "ms");
+  
+  if (analysisTime > maxAnalysisTime) {
+    debugPrint("⚠️ Analysis took too long, may have timed out");
+    product.name = "Scanned Code: " + scannedCode;
+    product.type = "Timeout";
+    product.details = "Analysis timed out after " + String(analysisTime) + "ms";
+    product.price = "N/A";
+    product.category = "Unknown";
+    product.location = "Unknown";
+  }
+  
   return product;
 }
 
-// Function to call trained AI model for benefits analysis
-String callAIBenefitsAnalysis(String barcodeData, String productName) {
-  if (!wifiConnected) {
-    return "WiFi not connected";
-  }
-  
-  HTTPClient http;
-  http.begin(ai_model_url);
-  http.addHeader("Content-Type", "application/json");
-  
-  // Create JSON payload for benefits analysis using AI server
-  StaticJsonDocument<300> doc;
-  doc["barcodeData"] = barcodeData;
-  doc["deviceId"] = deviceId;
-  doc["deviceName"] = deviceName;
-  doc["scanType"] = "BENEFITS_ANALYSIS";
-  doc["timestamp"] = millis();
-  
-  String jsonString;
-  serializeJson(doc, jsonString);
-  
-  debugPrint("Requesting benefits analysis from trained AI for: " + productName);
-  
-  int httpResponseCode = http.POST(jsonString);
-  
-  if (httpResponseCode > 0) {
-    String response = http.getString();
-    debugPrint("Trained AI benefits response: " + response);
-    
-    if (httpResponseCode == 200) {
-      // Parse JSON response from AI server
-      DynamicJsonDocument responseDoc(1024);
-      deserializeJson(responseDoc, response);
-      
-      if (responseDoc["success"]) {
-        String description = responseDoc["description"].as<String>();
-        return description;
-      }
-    }
-  }
-  
-  http.end();
-  return "Trained AI analysis unavailable";
-}
 
 // Function to connect to WiFi (Enhanced with Debug)
 void connectToWiFi() {
@@ -493,15 +778,14 @@ void connectToWiFi() {
   debugPrint("=== WiFi Connection Complete ===");
 }
 
-// Function to register with Robridge server
+// Function to register with Robridge server - Enhanced connection
 void registerWithRobridge() {
   if (!wifiConnected) {
+    debugPrint("Cannot register with Robridge - WiFi not connected");
     return;
   }
   
-  HTTPClient http;
-  http.begin(String(expressServerURL) + "/api/esp32/register");
-  http.addHeader("Content-Type", "application/json");
+  debugPrint("=== Registering with Robridge Server ===");
   
   // Create JSON payload
   StaticJsonDocument<200> doc;
@@ -513,66 +797,175 @@ void registerWithRobridge() {
   String jsonString;
   serializeJson(doc, jsonString);
   
-  Serial.println("Registering with Robridge server...");
-  Serial.println("Payload: " + jsonString);
+  debugPrint("Registration Payload: " + jsonString);
+  
+  HTTPClient http;
+  bool registrationSuccess = false;
+  
+  // Try HTTP first
+  String registerUrl = "http://robridge-express.onrender.com/api/esp32/register";
+  debugPrint("Trying HTTP registration: " + registerUrl);
+  
+  http.begin(registerUrl);
+  http.setTimeout(20000);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("User-Agent", "ESP32-Robridge/2.0");
   
   int httpResponseCode = http.POST(jsonString);
+  debugPrint("HTTP Registration Response: " + String(httpResponseCode));
   
-  if (httpResponseCode > 0) {
+  if (httpResponseCode == 200) {
+    registrationSuccess = true;
+    debugPrint("✅ HTTP registration successful!");
+  } else if (httpResponseCode == 307 || httpResponseCode == 301 || httpResponseCode == 302) {
+    debugPrint("🔄 HTTP redirect detected (Code: " + String(httpResponseCode) + "), following redirect...");
+    http.end();
+    registrationSuccess = false;
+  } else if (httpResponseCode > 0) {
+    registrationSuccess = true;
+    debugPrint("✅ HTTP registration successful!");
+  } else {
+    debugPrint("❌ HTTP registration failed: " + http.errorToString(httpResponseCode));
+    http.end();
+  }
+  
+  // Try HTTPS if HTTP didn't work or was redirected
+  if (!registrationSuccess && (httpResponseCode == 307 || httpResponseCode == 301 || httpResponseCode == 302 || httpResponseCode <= 0)) {
+    debugPrint("Trying HTTPS registration...");
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
+    secureClient.setTimeout(30000);
+    
+    registerUrl = "https://robridge-express.onrender.com/api/esp32/register";
+    http.begin(secureClient, registerUrl);
+    http.setTimeout(30000);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("User-Agent", "ESP32-Robridge/2.0");
+    
+    httpResponseCode = http.POST(jsonString);
+    debugPrint("HTTPS Registration Response: " + String(httpResponseCode));
+    
+    if (httpResponseCode > 0) {
+      registrationSuccess = true;
+      debugPrint("✅ HTTPS registration successful!");
+    } else {
+      debugPrint("❌ HTTPS registration failed: " + http.errorToString(httpResponseCode));
+    }
+  }
+  
+  if (registrationSuccess) {
     String response = http.getString();
-    Serial.println("Registration response: " + response);
+    debugPrint("Registration Response: " + response);
     
     if (httpResponseCode == 200) {
       isRegistered = true;
       robridgeConnected = true;
-      Serial.println("Registered with Robridge successfully!");
+      debugPrint("✅ Registered with Robridge successfully!");
+    } else {
+      debugPrint("⚠️ Registration response: HTTP " + String(httpResponseCode));
+      robridgeConnected = false;
     }
   } else {
-    Serial.println("Robridge registration failed. HTTP error: " + String(httpResponseCode));
+    debugPrint("❌ Robridge registration failed - all connection attempts failed");
     robridgeConnected = false;
   }
   
   http.end();
+  debugPrint("=== Registration Complete ===");
 }
 
-// Function to send ping to Robridge server
+// Function to send ping to Robridge server - Enhanced connection
 void sendPingToRobridge() {
   if (!isRegistered || !wifiConnected) {
+    debugPrint("Cannot ping Robridge - not registered or WiFi disconnected");
     return;
   }
   
+  debugPrint("Sending ping to Robridge server...");
+  
   HTTPClient http;
-  http.begin(String(expressServerURL) + "/api/esp32/ping/" + deviceId);
+  bool pingSuccess = false;
+  
+  // Try HTTP first
+  String pingUrl = "http://robridge-express.onrender.com/api/esp32/ping/" + deviceId;
+  debugPrint("Trying HTTP ping: " + pingUrl);
+  
+  http.begin(pingUrl);
+  http.setTimeout(15000);
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("User-Agent", "ESP32-Robridge/2.0");
   
   int httpResponseCode = http.POST("{}");
+  debugPrint("HTTP Ping Response: " + String(httpResponseCode));
   
   if (httpResponseCode == 200) {
-    Serial.println("Ping to Robridge successful");
-    robridgeConnected = true;
+    pingSuccess = true;
+    debugPrint("✅ HTTP ping successful!");
+  } else if (httpResponseCode == 307 || httpResponseCode == 301 || httpResponseCode == 302) {
+    debugPrint("🔄 HTTP redirect detected (Code: " + String(httpResponseCode) + "), following redirect...");
+    http.end();
+    pingSuccess = false;
+  } else if (httpResponseCode > 0) {
+    pingSuccess = true;
+    debugPrint("✅ HTTP ping successful!");
   } else {
-    Serial.println("Ping to Robridge failed. HTTP error: " + String(httpResponseCode));
-    if (httpResponseCode == 404) {
-      // Device not found, try to re-register
+    debugPrint("❌ HTTP ping failed: " + http.errorToString(httpResponseCode));
+    http.end();
+  }
+  
+  // Try HTTPS if HTTP didn't work or was redirected
+  if (!pingSuccess && (httpResponseCode == 307 || httpResponseCode == 301 || httpResponseCode == 302 || httpResponseCode <= 0)) {
+    
+    // Try HTTPS
+    debugPrint("Trying HTTPS ping...");
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
+    secureClient.setTimeout(20000);
+    
+    pingUrl = "https://robridge-express.onrender.com/api/esp32/ping/" + deviceId;
+    http.begin(secureClient, pingUrl);
+    http.setTimeout(20000);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("User-Agent", "ESP32-Robridge/2.0");
+    
+    httpResponseCode = http.POST("{}");
+    debugPrint("HTTPS Ping Response: " + String(httpResponseCode));
+    
+    if (httpResponseCode > 0) {
+      pingSuccess = true;
+      debugPrint("✅ HTTPS ping successful!");
+    } else {
+      debugPrint("❌ HTTPS ping failed: " + http.errorToString(httpResponseCode));
+    }
+  }
+  
+  if (pingSuccess) {
+    if (httpResponseCode == 200) {
+      debugPrint("✅ Ping to Robridge successful");
+      robridgeConnected = true;
+    } else if (httpResponseCode == 404) {
+      debugPrint("⚠️ Device not found (404), attempting re-registration...");
       isRegistered = false;
       robridgeConnected = false;
       registerWithRobridge();
+    } else {
+      debugPrint("⚠️ Ping response: HTTP " + String(httpResponseCode));
     }
+  } else {
+    debugPrint("❌ All ping attempts failed");
   }
   
   http.end();
 }
 
-// Function to send barcode scan to Robridge server
+// Function to send barcode scan to Robridge server - Enhanced connection
 void sendScanToRobridge(String barcodeData, Product* product = nullptr) {
   if (!isRegistered || !wifiConnected) {
-    Serial.println("Cannot send scan to Robridge - not registered or WiFi disconnected");
+    debugPrint("Cannot send scan to Robridge - not registered or WiFi disconnected");
     return;
   }
   
-  HTTPClient http;
-  http.begin(String(expressServerURL) + "/api/esp32/scan/" + deviceId);
-  http.addHeader("Content-Type", "application/json");
+  debugPrint("=== Sending Scan to Robridge ===");
   
   // Create JSON payload
   StaticJsonDocument<500> doc;
@@ -588,30 +981,81 @@ void sendScanToRobridge(String barcodeData, Product* product = nullptr) {
     doc["productPrice"] = product->price;
     doc["productCategory"] = product->category;
     doc["productLocation"] = product->location;
-    doc["foundInDatabase"] = product->foundInDatabase;
-    doc["source"] = product->foundInDatabase ? "database" : "ai_analysis";
-    Serial.println("Product found: " + product->name + " (" + product->type + ")");
-    Serial.println("Source: " + String(product->foundInDatabase ? "Database" : "AI Analysis"));
+    doc["source"] = "ai_analysis";
+    debugPrint("Product found: " + product->name + " (" + product->type + ")");
+    debugPrint("Source: AI Analysis");
   } else {
-    doc["foundInDatabase"] = false;
     doc["source"] = "unknown";
-    Serial.println("Product not found - no data available");
+    debugPrint("Product not found - no data available");
   }
   
   String jsonString;
   serializeJson(doc, jsonString);
   
-  Serial.println("Sending scan to Robridge server...");
-  Serial.println("Payload: " + jsonString);
+  debugPrint("Scan Payload: " + jsonString);
+  
+  HTTPClient http;
+  bool scanSuccess = false;
+  
+  // Try HTTP first
+  String scanUrl = "http://robridge-express.onrender.com/api/esp32/scan/" + deviceId;
+  debugPrint("Trying HTTP scan: " + scanUrl);
+  
+  http.begin(scanUrl);
+  http.setTimeout(20000);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("User-Agent", "ESP32-Robridge/2.0");
   
   int httpResponseCode = http.POST(jsonString);
+  debugPrint("HTTP Scan Response: " + String(httpResponseCode));
   
-  if (httpResponseCode > 0) {
+  if (httpResponseCode == 200) {
+    scanSuccess = true;
+    debugPrint("✅ HTTP scan successful!");
+  } else if (httpResponseCode == 307 || httpResponseCode == 301 || httpResponseCode == 302) {
+    debugPrint("🔄 HTTP redirect detected (Code: " + String(httpResponseCode) + "), following redirect...");
+    http.end();
+    scanSuccess = false;
+  } else if (httpResponseCode > 0) {
+    scanSuccess = true;
+    debugPrint("✅ HTTP scan successful!");
+  } else {
+    debugPrint("❌ HTTP scan failed: " + http.errorToString(httpResponseCode));
+    http.end();
+  }
+  
+  // Try HTTPS if HTTP didn't work or was redirected
+  if (!scanSuccess && (httpResponseCode == 307 || httpResponseCode == 301 || httpResponseCode == 302 || httpResponseCode <= 0)) {
+    
+    // Try HTTPS
+    debugPrint("Trying HTTPS scan...");
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
+    secureClient.setTimeout(30000);
+    
+    scanUrl = "https://robridge-express.onrender.com/api/esp32/scan/" + deviceId;
+    http.begin(secureClient, scanUrl);
+    http.setTimeout(30000);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("User-Agent", "ESP32-Robridge/2.0");
+    
+    httpResponseCode = http.POST(jsonString);
+    debugPrint("HTTPS Scan Response: " + String(httpResponseCode));
+    
+    if (httpResponseCode > 0) {
+      scanSuccess = true;
+      debugPrint("✅ HTTPS scan successful!");
+    } else {
+      debugPrint("❌ HTTPS scan failed: " + http.errorToString(httpResponseCode));
+    }
+  }
+  
+  if (scanSuccess) {
     String response = http.getString();
-    Serial.println("Robridge scan response: " + response);
+    debugPrint("Robridge scan response: " + response);
     
     if (httpResponseCode == 200) {
-      Serial.println("Scan sent to Robridge successfully!");
+      debugPrint("✅ Scan sent to Robridge successfully!");
       scanCount++;
       
       // Parse response to get scan ID
@@ -620,14 +1064,17 @@ void sendScanToRobridge(String barcodeData, Product* product = nullptr) {
       
       if (responseDoc["success"]) {
         String scanId = responseDoc["scanId"];
-        Serial.println("Robridge Scan ID: " + scanId);
+        debugPrint("Robridge Scan ID: " + scanId);
       }
+    } else {
+      debugPrint("⚠️ Scan response: HTTP " + String(httpResponseCode));
     }
   } else {
-    Serial.println("Failed to send scan to Robridge. HTTP error: " + String(httpResponseCode));
+    debugPrint("❌ Failed to send scan to Robridge - all connection attempts failed");
   }
   
   http.end();
+  debugPrint("=== Scan Send Complete ===");
 }
 
 // Function to call Gemini API
@@ -730,33 +1177,13 @@ void displayText(String text, int startY = 0) {
   display.display();
 }
 
-// Function to display status screen (Enhanced with WiFi details)
+// Function to display status screen (Ready to scan)
 void displayStatusScreen() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SH110X_WHITE);
-  display.setCursor(0, 0);
-  display.println("BVS-110 Scanner Ready");
-  
-  // WiFi status with details
-  if (wifiConnected) {
-    display.println("WiFi: Connected");
-    display.println("RSSI: " + String(wifiRSSI) + " dBm");
-    display.println("Uptime: " + String((millis() - wifiConnectedTime) / 1000) + "s");
-  } else {
-    display.println("WiFi: Disconnected");
-    if (wifiReconnectInProgress) {
-      display.println("Reconnecting...");
-    } else {
-      display.println("Attempts: " + String(reconnectAttempts));
-    }
-  }
-  
-  display.println("Robridge: " + String(robridgeConnected ? "Connected" : "Disconnected"));
-  display.println("Database: SQL Integrated");
-  display.println("AI Model: Trained LLM");
-  display.println("Scans: " + String(scanCount));
-  display.println("Last: " + lastScannedCode);
+  display.setCursor(20, 30);
+  display.println("Ready to scan");
   display.display();
 }
 
@@ -943,7 +1370,7 @@ void setup() {
   // Show logo
   debugPrint("Displaying startup logo...");
   display.clearDisplay();
-  display.drawBitmap(0, 0, logo16_glcd_bmp, 128, 64, 1);
+  display.drawBitmap(0, 0, epd_bitmap_ro_bridge, 128, 64, 1);
   display.display();
   delay(3000);
   
@@ -989,11 +1416,21 @@ void loop() {
       for (int i = 0; i < networks; i++) {
         debugPrint("  " + String(i+1) + ": " + WiFi.SSID(i) + " (RSSI: " + String(WiFi.RSSI(i)) + " dBm)");
       }
+    } else if (command == "test_server") {
+      debugPrint("Testing server connection...");
+      Product testProduct = analyzeProductWithAI("123456789");
+      debugPrint("Test completed");
+    } else if (command == "register") {
+      debugPrint("Manually registering with Robridge server...");
+      registerWithRobridge();
+      debugPrint("Registration attempt completed");
     } else if (command == "help") {
       debugPrint("Available commands:");
       debugPrint("  wifi_status - Show detailed WiFi status");
       debugPrint("  wifi_reconnect - Force WiFi reconnection");
       debugPrint("  wifi_scan - Scan for available networks");
+      debugPrint("  test_server - Test server connection");
+      debugPrint("  register - Manually register with Robridge");
       debugPrint("  help - Show this help message");
     }
   }
@@ -1030,105 +1467,51 @@ void loop() {
       display.display();
       delay(2000); // Show AI Analysis for 2 seconds
 
-      // Step 1: Lookup product in SQL database
+      // Direct AI analysis - skip database lookup
       display.clearDisplay();
       display.setTextSize(1);
       display.setTextColor(SH110X_WHITE);
       display.setCursor(0, 0);
-      display.println("Checking database...");
+      display.println("Analyzing with AI...");
       display.println("Barcode: " + barcodeData);
       display.display();
+      delay(2000);
       
-      Product dbProduct = lookupProductInDatabase(barcodeData);
+      // Analyze with AI model directly
+      Product aiProduct = analyzeProductWithAI(barcodeData);
       
-      if (dbProduct.foundInDatabase) {
-        // Product found in database - show database info and benefits
-        String productInfo = "DATABASE MATCH:\n";
-        productInfo += "Name: " + dbProduct.name + "\n";
-        productInfo += "Type: " + dbProduct.type + "\n";
-        productInfo += "Price: " + dbProduct.price + "\n";
-        productInfo += "Category: " + dbProduct.category + "\n";
-        productInfo += "\nAnalyzing benefits\nwith AI model...";
+      if (aiProduct.name.length() > 0) {
+        // AI successfully analyzed the product
+        String aiInfo = "AI ANALYSIS:\n";
+        aiInfo += "Name: " + aiProduct.name + "\n";
+        aiInfo += "Type: " + aiProduct.type + "\n";
+        aiInfo += "Category: " + aiProduct.category + "\n";
+        aiInfo += "\nDetails:\n" + aiProduct.details;
         
-        // Display database product information
-        displayText(productInfo);
-        delay(3000);
-        
-        // Get AI analysis for benefits
-        display.clearDisplay();
-        display.setTextSize(1);
-        display.setTextColor(SH110X_WHITE);
-        display.setCursor(0, 0);
-        display.println("AI Analysis in progress...");
-        display.println("Analyzing benefits for:");
-        display.println(dbProduct.name);
-        display.display();
-        
-        // Call AI model for benefits analysis
-        String aiBenefits = callAIBenefitsAnalysis(barcodeData, dbProduct.name);
-        
-        // Display AI benefits
-        String fullInfo = "PRODUCT FOUND:\n";
-        fullInfo += "Name: " + dbProduct.name + "\n";
-        fullInfo += "Type: " + dbProduct.type + "\n";
-        fullInfo += "Price: " + dbProduct.price + "\n";
-        fullInfo += "\nAI BENEFITS:\n" + aiBenefits;
-        
-        displayText(fullInfo);
+        displayText(aiInfo);
         delay(8000);
         
-        // Send to Robridge server with database product info
+        // Send to Robridge server with AI product info
         if (robridgeConnected) {
-          sendScanToRobridge(barcodeData, &dbProduct);
+          sendScanToRobridge(barcodeData, &aiProduct);
         }
       } else {
-        // Product not found in database - use AI model for analysis
+        // AI analysis failed - show basic info
         display.clearDisplay();
         display.setTextSize(1);
         display.setTextColor(SH110X_WHITE);
         display.setCursor(0, 0);
-        display.println("Not in database");
-        display.println("Analyzing with AI...");
-        display.println("Barcode: " + barcodeData);
+        display.println("Scanned Code:");
+        display.println(barcodeData);
+        display.println("");
+        display.println("AI analysis failed");
+        display.println("Code recorded");
         display.display();
-        delay(2000);
+        delay(3000);
         
-        // Analyze with AI model
-        Product aiProduct = analyzeProductWithAI(barcodeData);
-        
-        if (aiProduct.name.length() > 0) {
-          // AI successfully analyzed the product
-          String aiInfo = "AI ANALYSIS:\n";
-          aiInfo += "Name: " + aiProduct.name + "\n";
-          aiInfo += "Type: " + aiProduct.type + "\n";
-          aiInfo += "Category: " + aiProduct.category + "\n";
-          aiInfo += "\nDetails:\n" + aiProduct.details;
-          
-          displayText(aiInfo);
-          delay(8000);
-          
-          // Send to Robridge server with AI product info
-          if (robridgeConnected) {
-            sendScanToRobridge(barcodeData, &aiProduct);
-          }
-        } else {
-          // AI analysis failed
-          display.clearDisplay();
-          display.setTextSize(1);
-          display.setTextColor(SH110X_WHITE);
-          display.setCursor(0, 0);
-          display.println("Unknown Product");
-          display.println("Barcode: " + barcodeData);
-          display.println("");
-          display.println("Not found in database");
-          display.println("AI analysis failed");
-          display.display();
-          delay(3000);
-          
-          // Send to Robridge server anyway
-          if (robridgeConnected) {
-            sendScanToRobridge(barcodeData, nullptr);
-          }
+        // Send to Robridge server anyway
+        if (robridgeConnected) {
+          sendScanToRobridge(barcodeData, nullptr);
         }
       }
 
