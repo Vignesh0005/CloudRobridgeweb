@@ -298,7 +298,7 @@ app.post('/api/esp32/scan/:deviceId', async (req, res) => {
     try {
       console.log(`🤖 Forwarding to AI server at ${AI_SERVER_URL} for barcode: ${barcodeData}`);
       
-        const aiResponse = await fetch(`${AI_SERVER_URL}/scan`, {
+        const aiResponse = await fetch(`${AI_SERVER_URL}/api/esp32/scan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -757,6 +757,37 @@ async function callAIForProductAnalysis(barcode) {
     };
   }
 }
+
+// Create barcodes table if it doesn't exist
+const initBarcodesTable = () => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      CREATE TABLE IF NOT EXISTS barcodes (
+        id TEXT PRIMARY KEY,
+        deviceId TEXT,
+        barcodeData TEXT,
+        scanType TEXT,
+        imageData TEXT,
+        timestamp TEXT,
+        processed INTEGER,
+        title TEXT,
+        category TEXT,
+        description TEXT,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+    
+    db.run(sql, (err) => {
+      if (err) {
+        console.error('Error creating barcodes table:', err);
+        reject(err);
+      } else {
+        console.log('✅ Barcodes table created/verified');
+        resolve();
+      }
+    });
+  });
+};
 
 // Create saved_scans table if it doesn't exist
 const initSavedScansTable = () => {
@@ -1573,7 +1604,8 @@ const startServer = async () => {
     await initDatabase();
     console.log('✅ Database connection initialized');
     
-    // Initialize saved_scans table
+    // Initialize tables
+    await initBarcodesTable();
     await initSavedScansTable();
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
