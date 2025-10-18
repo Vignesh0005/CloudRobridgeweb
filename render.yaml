@@ -12,10 +12,7 @@ services:
       - key: PORT
         value: 10000
       - key: AI_SERVER_URL
-        fromService:
-          type: web
-          name: robridge-ai
-          property: host
+        value: https://robridge-ai.onrender.com
 
   # AI Analysis Server (FastAPI)
   - type: web

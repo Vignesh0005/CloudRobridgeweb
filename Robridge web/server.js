@@ -310,7 +310,7 @@ app.post('/api/esp32/scan/:deviceId', async (req, res) => {
           scanType: scanType || 'ESP32_SCAN',
           timestamp: timestamp || Date.now()
         }),
-        signal: AbortSignal.timeout(5000) // 5 second timeout
+        signal: AbortSignal.timeout(15000) // 15 second timeout for Render.com cold starts
       });
       
       if (aiResponse.ok) {
@@ -318,10 +318,13 @@ app.post('/api/esp32/scan/:deviceId', async (req, res) => {
         console.log('✅ AI Analysis completed successfully!');
         console.log('AI Analysis:', JSON.stringify(aiAnalysis, null, 2));
       } else {
+        const errorText = await aiResponse.text();
         console.log(`⚠️ AI server returned status ${aiResponse.status}, no AI analysis available`);
+        console.log(`⚠️ AI server error response: ${errorText}`);
       }
     } catch (aiError) {
       console.error('❌ AI server communication error:', aiError.message);
+      console.error('❌ Full error details:', aiError);
       console.log(`ℹ️  Make sure AI server is running at: ${AI_SERVER_URL}`);
     }
     
