@@ -11,8 +11,19 @@ from fastapi.middleware.cors import CORSMiddleware
 # ======================
 # CONFIGURATION
 # ======================
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "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")
-client = OpenAI(api_key=OPENAI_API_KEY)
+# Configure logging first
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Validate API key
+if not OPENAI_API_KEY:
+    logger.warning("OPENAI_API_KEY environment variable is not set!")
+    logger.warning("AI analysis will use fallback responses.")
+    client = None
+else:
+    client = OpenAI(api_key=OPENAI_API_KEY)
 
 app = FastAPI(title="Robridge AI Scanner", version="2.0.0")
 
@@ -24,10 +35,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Log the API key being used
 logger.info(f"Using OpenAI API Key: {OPENAI_API_KEY[:20]}...")
