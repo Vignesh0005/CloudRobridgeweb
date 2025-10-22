@@ -495,15 +495,15 @@ Product analyzeProductWithAI(String scannedCode) {
   bool connectionSuccess = false;
   String serverUrl = "";
   
-  // Strategy 1: Try HTTP first (Render.com should redirect to HTTPS)
-  debugPrint("🔔 Strategy 1: Trying HTTP connection to wake up server...");
-  serverUrl = "http://robridge-express.onrender.com/api/esp32/scan/" + deviceId;
+  // Strategy 1: Try AI server directly (HTTP first)
+  debugPrint("🔔 Strategy 1: Trying AI server directly...");
+  serverUrl = "http://robridge-ai.onrender.com/scan";
   http.begin(serverUrl);
   http.setTimeout(20000); // 20 second timeout for sleeping servers
   http.addHeader("Content-Type", "application/json");
   http.addHeader("User-Agent", "ESP32-Robridge/2.0");
   
-  String payload = "{\"scanned_value\":\"" + scannedCode + "\"}";
+  String payload = "{\"barcode\":\"" + scannedCode + "\",\"max_length\":200,\"temperature\":0.7,\"top_p\":0.9}";
   debugPrint("Payload: " + payload);
   
   int httpResponseCode = http.POST(payload);
@@ -531,7 +531,7 @@ Product analyzeProductWithAI(String scannedCode) {
     secureClient.setInsecure(); // Skip certificate verification for Render.com
     secureClient.setTimeout(15000); // Reduced timeout to 15 seconds
     
-    serverUrl = "https://robridge-express.onrender.com/api/esp32/scan/" + deviceId;
+    serverUrl = "https://robridge-ai.onrender.com/scan";
     debugPrint("Attempting HTTPS connection to: " + serverUrl);
     
     if (http.begin(secureClient, serverUrl)) {
@@ -596,29 +596,21 @@ Product analyzeProductWithAI(String scannedCode) {
     DeserializationError error = deserializeJson(doc, response);
     
     if (!error) {
-      // Check if response has aiAnalysis object (new format)
-      if (doc["aiAnalysis"]) {
-        String title = doc["aiAnalysis"]["title"] | "N/A";
-        String category = doc["aiAnalysis"]["category"] | "N/A";
-        String description = doc["aiAnalysis"]["description"] | "N/A";
-        bool isFallback = doc["aiAnalysis"]["fallback"] | false;
+      // Parse AI server response format
+      if (doc["success"] && doc["product_description"]) {
+        String description = doc["product_description"] | "No description available";
         
         debugPrint("✅ AI Analysis Success!");
-        if (isFallback) {
-          debugPrint("⚠️ Using fallback analysis (AI server unavailable)");
-        }
-        debugPrint("Title: " + title);
-        debugPrint("Category: " + category);
         debugPrint("Description: " + description);
         
         // Fill product info for display
-        product.name = title;
-        product.type = category;
+        product.name = "AI Analyzed Product";
+        product.type = "AI Analysis";
         product.details = description;
         product.price = "N/A";
-        product.category = category;
+        product.category = "AI Generated";
         product.location = "Unknown";
-      } else {
+      } else if (doc["title"]) {
         // Fallback to old format
         String title = doc["title"] | "N/A";
         String category = doc["category"] | "N/A";
@@ -635,6 +627,14 @@ Product analyzeProductWithAI(String scannedCode) {
         product.details = description;
         product.price = "N/A";
         product.category = category;
+        product.location = "Unknown";
+      } else {
+        debugPrint("❌ Unexpected response format");
+        product.name = "Scanned Code: " + scannedCode;
+        product.type = "Parse Error";
+        product.details = "Unexpected response format from AI server";
+        product.price = "N/A";
+        product.category = "Unknown";
         product.location = "Unknown";
       }
       
@@ -699,83 +699,81 @@ Product analyzeProductWithAI(String scannedCode) {
 }
 
 
-// Function to connect to WiFi (Enhanced with Debug)
-void connectToWiFi() {
-  debugPrint("=== Initial WiFi Connection ===");
-  debugPrint("SSID: " + String(ssid));
-  debugPrint("Password: [HIDDEN]");
-  
+/* ------------------------------------------------------------------------- */
+/*  NEW connectWiFi()  –  fast auto-connect with on-screen feedback          */
+/* ------------------------------------------------------------------------- */
+void connectWiFi() {
   display.clearDisplay();
+  displayStatusBar();
+  display.setCursor(0, 10);
+  display.println("Auto-connecting...");
+  display.display();
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin();                       // use previously saved credentials
+  uint8_t tries = 0;                  // 700 ms * 10 ≈ 7 s time-out
+  while (WiFi.status() != WL_CONNECTED && tries < 10) {
+    delay(700);
+    tries++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {               // *** SUCCESS ***
+    deviceIP = WiFi.localIP().toString();
+    Serial.println("\nWiFi connected (auto)");
+    Serial.println("IP: " + deviceIP);
+    
+    // Register with Robridge cloud server
+    registerWithRobridge();
+    return;                                          // nothing more to do
+  }
+
+  /* -----------------------------------------------------------------------
+     Auto-connect failed  ->  show message and start config portal
+     ----------------------------------------------------------------------- */
+  display.clearDisplay();
+  displayStatusBar();
+  display.setCursor(0, 10);
+  display.println("Manual connect");
+  display.setCursor(0, 20);
+  display.println("AP: Robridge-Scanner");
+  display.setCursor(0, 30);
+  display.println("PWD: rob123456");
+  display.display();
+
+  WiFiManager wm;
+  wm.setConfigPortalTimeout(180);                    // 3 min
+  if (!wm.autoConnect("Robridge-Scanner", "rob123456"))
+    ESP.restart();                                   // time-out -> reboot
+
+  deviceIP = WiFi.localIP().toString();
+  Serial.println("\nWiFi connected (portal)");
+  Serial.println("IP: " + deviceIP);
+  
+  // Register with Robridge cloud server
+  registerWithRobridge();
+}
+
+void displayStatusBar() {
+  display.drawLine(0, 8, 127, 8, SH110X_WHITE);
+  // WiFi
+  if (WiFi.status() == WL_CONNECTED) {
+    display.fillRect(2, 5, 2, 2, SH110X_WHITE);
+    display.fillRect(5, 3, 2, 4, SH110X_WHITE);
+    display.fillRect(8, 1, 2, 6, SH110X_WHITE);
+    display.fillRect(11, 0, 2, 7, SH110X_WHITE);
+  } else {
+    display.drawLine(2, 0, 12, 7, SH110X_WHITE);
+    display.drawLine(12, 0, 2, 7, SH110X_WHITE);
+  }
+  // Battery placeholder
+  display.drawRect(110, 1, 14, 6, SH110X_WHITE);
+  display.fillRect(124, 3, 2, 2, SH110X_WHITE);
+  display.fillRect(112, 3, 10, 2, SH110X_WHITE);
+  // Device ID
   display.setTextSize(1);
   display.setTextColor(SH110X_WHITE);
-  display.setCursor(0, 0);
-  display.println("Connecting to WiFi...");
-  display.display();
-  
-  debugPrint("Starting WiFi connection...");
-  WiFi.begin(ssid, password);
-  
-  int attempts = 0;
-  int maxAttempts = 20;
-  
-  debugPrint("Waiting for connection (max " + String(maxAttempts) + " attempts)...");
-  
-  while (WiFi.status() != WL_CONNECTED && attempts < maxAttempts) {
-    delay(500);
-    attempts++;
-    
-    // Update display with progress
-    display.print(".");
-    display.display();
-    
-    // Debug progress every 2 seconds
-    if (attempts % 4 == 0) {
-      debugPrint("Connection attempt " + String(attempts) + "/" + String(maxAttempts) + " - Status: " + getWiFiStatusString(WiFi.status()));
-    }
-  }
-  
-  if (WiFi.status() == WL_CONNECTED) {
-    wifiConnected = true;
-    wifiConnectedTime = millis();
-    wifiRSSI = WiFi.RSSI();
-    
-    debugPrint("WiFi Connection Successful!");
-    debugPrint("IP Address: " + WiFi.localIP().toString());
-    debugPrint("RSSI: " + String(wifiRSSI) + " dBm");
-    debugPrint("Connection time: " + String(attempts * 500) + " ms");
-    
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println("WiFi Connected!");
-    display.print("IP: ");
-    display.println(WiFi.localIP());
-    display.print("RSSI: ");
-    display.print(String(wifiRSSI));
-    display.println(" dBm");
-    display.display();
-    delay(2000);
-    
-    // Register with Robridge server
-    debugPrint("Attempting to register with Robridge server...");
-    registerWithRobridge();
-  } else {
-    wifiConnected = false;
-    robridgeConnected = false;
-    
-    debugPrint("WiFi Connection Failed!");
-    debugPrint("Final Status: " + getWiFiStatusString(WiFi.status()));
-    debugPrint("Attempts made: " + String(attempts));
-    
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println("WiFi Failed!");
-    display.println("Status: " + getWiFiStatusString(WiFi.status()));
-    display.println("Check credentials");
-    display.display();
-    delay(3000);
-  }
-  
-  debugPrint("=== WiFi Connection Complete ===");
+  display.setCursor(45, 0);
+  display.print(deviceId);
 }
 
 // Function to register with Robridge server - Enhanced connection
@@ -1385,7 +1383,7 @@ void setup() {
   
   // Connect to WiFi and register with Robridge
   debugPrint("Starting WiFi connection process...");
-  connectToWiFi();
+  connectWiFi();
   
   // Show ready message
   debugPrint("System initialization complete. Showing status screen...");
