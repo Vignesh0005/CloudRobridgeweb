@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # ======================
 # CONFIGURATION
 # ======================
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "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")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "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")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 app = FastAPI(title="Robridge AI Scanner", version="2.0.0")
