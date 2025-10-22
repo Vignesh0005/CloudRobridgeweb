@@ -23,18 +23,21 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>   // Use SH1106/SH1107 driver
 #include <WiFi.h>
+#include <WiFiManager.h>          // <- ADD THIS LINE
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <NetworkClientSecure.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>         // For storing server config
 
 // --- WiFi Configuration ---
 const char* ssid = "Barista";
 const char* password = "q7rfdrg4";
 
 // --- Robridge Server Configuration ---
-const char* expressServerURL = "https://robridge-express.onrender.com";  // Express backend
-const char* aiServerURL = "https://robridge-ai.onrender.com";  // AI server - Render hosted
+String expressServerURL = "https://robridge-express.onrender.com";  // Express backend
+String aiServerURL = "https://robridge-ai.onrender.com";  // AI server - Render hosted
+String customServerIP = "";  // Custom server IP from portal
 
 // --- ESP32 Device Configuration ---
 const String deviceId = "ESP32_GM77_SCANNER_001";
@@ -144,6 +147,10 @@ unsigned long lastPingTime = 0;
 unsigned long pingInterval = 30000; // Ping every 30 seconds
 bool isRegistered = false;
 unsigned long scanCount = 0;
+String deviceIP = "";  // Device IP address
+
+// --- Preferences for storing server config ---
+Preferences preferences;
 
 // --- WiFi Auto-Reconnect Variables ---
 unsigned long lastWiFiCheck = 0;
@@ -497,13 +504,13 @@ Product analyzeProductWithAI(String scannedCode) {
   
   // Strategy 1: Try AI server directly (HTTP first)
   debugPrint("🔔 Strategy 1: Trying AI server directly...");
-  serverUrl = "http://robridge-ai.onrender.com/scan";
+  serverUrl = aiServerURL + "/scan";
   http.begin(serverUrl);
   http.setTimeout(20000); // 20 second timeout for sleeping servers
   http.addHeader("Content-Type", "application/json");
   http.addHeader("User-Agent", "ESP32-Robridge/2.0");
   
-  String payload = "{\"barcode\":\"" + scannedCode + "\",\"max_length\":200,\"temperature\":0.7,\"top_p\":0.9}";
+  String payload = "{\"scanned_value\":\"" + scannedCode + "\"}";
   debugPrint("Payload: " + payload);
   
   int httpResponseCode = http.POST(payload);
@@ -531,7 +538,7 @@ Product analyzeProductWithAI(String scannedCode) {
     secureClient.setInsecure(); // Skip certificate verification for Render.com
     secureClient.setTimeout(15000); // Reduced timeout to 15 seconds
     
-    serverUrl = "https://robridge-ai.onrender.com/scan";
+    serverUrl = aiServerURL + "/scan";
     debugPrint("Attempting HTTPS connection to: " + serverUrl);
     
     if (http.begin(secureClient, serverUrl)) {
@@ -567,7 +574,7 @@ Product analyzeProductWithAI(String scannedCode) {
       
       // Strategy 3: Try alternative AI server
       debugPrint("🔔 Strategy 3: Trying alternative AI server...");
-      serverUrl = "https://robridge-ai.onrender.com/scan";
+      serverUrl = aiServerURL + "/scan";
       http.begin(secureClient, serverUrl);
       http.setTimeout(30000);
       http.addHeader("Content-Type", "application/json");
@@ -597,29 +604,39 @@ Product analyzeProductWithAI(String scannedCode) {
     
     if (!error) {
       // Parse AI server response format
-      if (doc["success"] && doc["product_description"]) {
-        String description = doc["product_description"] | "No description available";
+      if (doc["result"]) {
+        String result = doc["result"] | "No result available";
         
         debugPrint("✅ AI Analysis Success!");
-        debugPrint("Description: " + description);
+        debugPrint("Result: " + result);
         
-        // Fill product info for display
-        product.name = "AI Analyzed Product";
-        product.type = "AI Analysis";
-        product.details = description;
-        product.price = "N/A";
-        product.category = "AI Generated";
-        product.location = "Unknown";
-      } else if (doc["title"]) {
-        // Fallback to old format
-        String title = doc["title"] | "N/A";
-        String category = doc["category"] | "N/A";
-        String description = doc["description"] | "N/A";
+        // Parse the formatted result string
+        // Expected format: "Scanned Code: {code}\nTitle: {title}\nCategory: {category}\nDescription: {description}"
+        String lines[10];
+        int lineCount = 0;
+        int lastIndex = 0;
         
-        debugPrint("✅ AI Analysis Success!");
-        debugPrint("Title: " + title);
-        debugPrint("Category: " + category);
-        debugPrint("Description: " + description);
+        // Split by newlines
+        for (int i = 0; i <= result.length() && lineCount < 10; i++) {
+          if (i == result.length() || result.charAt(i) == '\n') {
+            lines[lineCount] = result.substring(lastIndex, i);
+            lineCount++;
+            lastIndex = i + 1;
+          }
+        }
+        
+        // Extract information
+        String title = "Unknown Product";
+        String category = "Unknown";
+        String description = result; // Use full result as description
+        
+        for (int i = 0; i < lineCount; i++) {
+          if (lines[i].startsWith("Title: ")) {
+            title = lines[i].substring(7);
+          } else if (lines[i].startsWith("Category: ")) {
+            category = lines[i].substring(10);
+          }
+        }
         
         // Fill product info for display
         product.name = title;
@@ -629,10 +646,10 @@ Product analyzeProductWithAI(String scannedCode) {
         product.category = category;
         product.location = "Unknown";
       } else {
-        debugPrint("❌ Unexpected response format");
+        debugPrint("❌ No result in response");
         product.name = "Scanned Code: " + scannedCode;
         product.type = "Parse Error";
-        product.details = "Unexpected response format from AI server";
+        product.details = "No result in AI server response";
         product.price = "N/A";
         product.category = "Unknown";
         product.location = "Unknown";
@@ -699,58 +716,106 @@ Product analyzeProductWithAI(String scannedCode) {
 }
 
 
-/* ------------------------------------------------------------------------- */
-/*  NEW connectWiFi()  –  fast auto-connect with on-screen feedback          */
-/* ------------------------------------------------------------------------- */
-void connectWiFi() {
+/* ----------------------------------------------------------
+   Auto-connect + OLED feedback  (requirement 1 & 2)
+---------------------------------------------------------- */
+void connectWiFi(){
   display.clearDisplay();
   displayStatusBar();
-  display.setCursor(0, 10);
-  display.println("Auto-connecting...");
+  display.setCursor(0,10);
+  display.println(F("Auto-connecting..."));
   display.display();
 
   WiFi.mode(WIFI_STA);
-  WiFi.begin();                       // use previously saved credentials
-  uint8_t tries = 0;                  // 700 ms * 10 ≈ 7 s time-out
-  while (WiFi.status() != WL_CONNECTED && tries < 10) {
-    delay(700);
-    tries++;
-  }
+  WiFi.begin();                             // try saved credentials
+  uint8_t tries = 0;                        // ~ 7 s timeout
+  while (WiFi.status() != WL_CONNECTED && tries < 10){ delay(700); tries++; }
 
-  if (WiFi.status() == WL_CONNECTED) {               // *** SUCCESS ***
+  if (WiFi.status() == WL_CONNECTED){       // *** SUCCESS ***
     deviceIP = WiFi.localIP().toString();
     Serial.println("\nWiFi connected (auto)");
     Serial.println("IP: " + deviceIP);
-    
-    // Register with Robridge cloud server
-    registerWithRobridge();
-    return;                                          // nothing more to do
+    loadServerConfig();                     // Load saved server config
+    registerWithRobridge();               // your existing function
+    return;
   }
 
-  /* -----------------------------------------------------------------------
-     Auto-connect failed  ->  show message and start config portal
-     ----------------------------------------------------------------------- */
+  /* --------------------------------------------------------
+     Auto-connect failed  ->  show manual message + portal
+     -------------------------------------------------------- */
   display.clearDisplay();
   displayStatusBar();
-  display.setCursor(0, 10);
-  display.println("Manual connect");
-  display.setCursor(0, 20);
-  display.println("AP: Robridge-Scanner");
-  display.setCursor(0, 30);
-  display.println("PWD: rob123456");
+  display.setCursor(0,10);
+  display.println(F("Manual connect"));
+  display.setCursor(0,20);
+  display.println(F("AP: Robridge-Scanner"));
+  display.setCursor(0,30);
+  display.println(F("PWD: rob123456"));
   display.display();
 
   WiFiManager wm;
-  wm.setConfigPortalTimeout(180);                    // 3 min
-  if (!wm.autoConnect("Robridge-Scanner", "rob123456"))
-    ESP.restart();                                   // time-out -> reboot
+  
+  // Add custom parameter for server IP
+  WiFiManagerParameter custom_server_ip("server_ip", "Server IP Address", customServerIP.c_str(), 40);
+  wm.addParameter(&custom_server_ip);
+  
+  wm.setConfigPortalTimeout(180);           // 3 min
+  if (!wm.autoConnect("Robridge-Scanner","rob123456"))
+    ESP.restart();                          // timeout -> reboot
+
+  // Save custom server IP if provided
+  String newServerIP = custom_server_ip.getValue();
+  if (newServerIP.length() > 0) {
+    customServerIP = newServerIP;
+    saveServerConfig();
+    updateServerURLs();
+    Serial.println("Custom server IP saved: " + customServerIP);
+  }
 
   deviceIP = WiFi.localIP().toString();
   Serial.println("\nWiFi connected (portal)");
   Serial.println("IP: " + deviceIP);
-  
-  // Register with Robridge cloud server
+  loadServerConfig();                       // Load saved server config
   registerWithRobridge();
+}
+
+// Function to save server configuration to preferences
+void saveServerConfig() {
+  preferences.begin("robridge", false);
+  preferences.putString("server_ip", customServerIP);
+  preferences.end();
+  debugPrint("Server config saved: " + customServerIP);
+}
+
+// Function to load server configuration from preferences
+void loadServerConfig() {
+  preferences.begin("robridge", true);
+  customServerIP = preferences.getString("server_ip", "");
+  preferences.end();
+  
+  if (customServerIP.length() > 0) {
+    updateServerURLs();
+    debugPrint("Server config loaded: " + customServerIP);
+  } else {
+    debugPrint("No custom server config found, using default cloud URLs");
+  }
+}
+
+// Function to update server URLs based on custom IP
+void updateServerURLs() {
+  if (customServerIP.length() > 0) {
+    // Use custom IP for local server
+    expressServerURL = "http://" + customServerIP + ":3000";
+    aiServerURL = "http://" + customServerIP + ":10000";
+    debugPrint("Updated server URLs to use custom IP:");
+    debugPrint("Express: " + expressServerURL);
+    debugPrint("AI: " + aiServerURL);
+  } else {
+    // Use default cloud URLs
+    expressServerURL = "https://robridge-express.onrender.com";
+    aiServerURL = "https://robridge-ai.onrender.com";
+    debugPrint("Using default cloud server URLs");
+  }
 }
 
 void displayStatusBar() {
@@ -801,7 +866,7 @@ void registerWithRobridge() {
   bool registrationSuccess = false;
   
   // Try HTTP first
-  String registerUrl = "http://robridge-express.onrender.com/api/esp32/register";
+  String registerUrl = expressServerURL + "/api/esp32/register";
   debugPrint("Trying HTTP registration: " + registerUrl);
   
   http.begin(registerUrl);
@@ -834,7 +899,7 @@ void registerWithRobridge() {
     secureClient.setInsecure();
     secureClient.setTimeout(30000);
     
-    registerUrl = "https://robridge-express.onrender.com/api/esp32/register";
+    registerUrl = expressServerURL + "/api/esp32/register";
     http.begin(secureClient, registerUrl);
     http.setTimeout(30000);
     http.addHeader("Content-Type", "application/json");
@@ -885,7 +950,7 @@ void sendPingToRobridge() {
   bool pingSuccess = false;
   
   // Try HTTP first
-  String pingUrl = "http://robridge-express.onrender.com/api/esp32/ping/" + deviceId;
+  String pingUrl = expressServerURL + "/api/esp32/ping/" + deviceId;
   debugPrint("Trying HTTP ping: " + pingUrl);
   
   http.begin(pingUrl);
@@ -920,7 +985,7 @@ void sendPingToRobridge() {
     secureClient.setInsecure();
     secureClient.setTimeout(20000);
     
-    pingUrl = "https://robridge-express.onrender.com/api/esp32/ping/" + deviceId;
+    pingUrl = expressServerURL + "/api/esp32/ping/" + deviceId;
     http.begin(secureClient, pingUrl);
     http.setTimeout(20000);
     http.addHeader("Content-Type", "application/json");
@@ -996,7 +1061,7 @@ void sendScanToRobridge(String barcodeData, Product* product = nullptr) {
   bool scanSuccess = false;
   
   // Try HTTP first
-  String scanUrl = "http://robridge-express.onrender.com/api/esp32/scan/" + deviceId;
+  String scanUrl = expressServerURL + "/api/esp32/scan/" + deviceId;
   debugPrint("Trying HTTP scan: " + scanUrl);
   
   http.begin(scanUrl);
@@ -1031,7 +1096,7 @@ void sendScanToRobridge(String barcodeData, Product* product = nullptr) {
     secureClient.setInsecure();
     secureClient.setTimeout(30000);
     
-    scanUrl = "https://robridge-express.onrender.com/api/esp32/scan/" + deviceId;
+    scanUrl = expressServerURL + "/api/esp32/scan/" + deviceId;
     http.begin(secureClient, scanUrl);
     http.setTimeout(30000);
     http.addHeader("Content-Type", "application/json");
@@ -1422,6 +1487,18 @@ void loop() {
       debugPrint("Manually registering with Robridge server...");
       registerWithRobridge();
       debugPrint("Registration attempt completed");
+    } else if (command == "server_config") {
+      debugPrint("=== Server Configuration ===");
+      debugPrint("Custom Server IP: " + (customServerIP.length() > 0 ? customServerIP : "Not set"));
+      debugPrint("Express Server URL: " + expressServerURL);
+      debugPrint("AI Server URL: " + aiServerURL);
+      debugPrint("========================");
+    } else if (command == "reset_config") {
+      debugPrint("Resetting server configuration...");
+      customServerIP = "";
+      saveServerConfig();
+      updateServerURLs();
+      debugPrint("Server configuration reset to default cloud URLs");
     } else if (command == "help") {
       debugPrint("Available commands:");
       debugPrint("  wifi_status - Show detailed WiFi status");
@@ -1429,6 +1506,8 @@ void loop() {
       debugPrint("  wifi_scan - Scan for available networks");
       debugPrint("  test_server - Test server connection");
       debugPrint("  register - Manually register with Robridge");
+      debugPrint("  server_config - Show current server configuration");
+      debugPrint("  reset_config - Reset to default cloud servers");
       debugPrint("  help - Show this help message");
     }
   }
