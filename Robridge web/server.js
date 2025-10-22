@@ -292,56 +292,75 @@ app.post('/api/esp32/scan/:deviceId', async (req, res) => {
     
     console.log(`ESP32 barcode scan received from ${device.deviceName}: ${barcodeData}`);
     
-    // Forward to AI server (server.py) for processing
-    // AI Server runs on port 8000!
+    // Check if ESP32 already provided product data
+    const { productName, productType, productDetails, productCategory, source } = req.body;
     let aiAnalysis = null;
-    try {
-      console.log(`🤖 Forwarding to AI server at ${AI_SERVER_URL} for barcode: ${barcodeData}`);
-      
-        const aiResponse = await fetch(`${AI_SERVER_URL}/api/esp32/scan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          barcodeData: barcodeData,
-          deviceId: deviceId,
-          deviceName: device.deviceName,
-          scanType: scanType || 'ESP32_SCAN',
-          timestamp: timestamp || Date.now()
-        }),
-        signal: AbortSignal.timeout(15000) // 15 second timeout for Render.com cold starts
-      });
-      
-      if (aiResponse.ok) {
-        aiAnalysis = await aiResponse.json();
-        console.log('✅ AI Analysis completed successfully!');
-        console.log('AI Analysis:', JSON.stringify(aiAnalysis, null, 2));
-      } else {
-        const errorText = await aiResponse.text();
-        console.log(`⚠️ AI server returned status ${aiResponse.status}, no AI analysis available`);
-        console.log(`⚠️ AI server error response: ${errorText}`);
-      }
-    } catch (aiError) {
-      console.error('❌ AI server communication error:', aiError.message);
-      console.error('❌ Full error details:', aiError);
-      console.log(`ℹ️  Make sure AI server is running at: ${AI_SERVER_URL}`);
-    }
     
-    // Provide fallback if no AI analysis available
-    if (!aiAnalysis) {
-      console.log('📦 Using fallback analysis (AI server not available)');
+    if (source === 'ai_analysis' && productName) {
+      // ESP32 already did AI analysis, use that data
+      console.log('✅ Using ESP32 AI analysis data');
       aiAnalysis = {
         success: true,
-        title: `Product ${barcodeData.substring(0, 20)}`,
-        category: 'Scanned Product',
-        description: 'Product scanned successfully. Start AI server on port 8000 for detailed analysis.',
-        description_short: `Scanned: ${barcodeData.substring(0, 30)}`,
+        title: productName,
+        category: productCategory || productType || 'Scanned Product',
+        description: productDetails || `Product: ${productName}`,
+        description_short: `${productName} - ${productType || 'Product'}`,
         country: 'Unknown',
         barcode: barcodeData,
         deviceId: deviceId,
-        fallback: true
+        source: 'esp32_ai'
       };
+      console.log('📊 ESP32 AI Analysis:', JSON.stringify(aiAnalysis, null, 2));
+    } else {
+      // Try AI server for analysis
+      try {
+        console.log(`🤖 Forwarding to AI server at ${AI_SERVER_URL} for barcode: ${barcodeData}`);
+        
+        const aiResponse = await fetch(`${AI_SERVER_URL}/api/esp32/scan`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            barcodeData: barcodeData,
+            deviceId: deviceId,
+            deviceName: device.deviceName,
+            scanType: scanType || 'ESP32_SCAN',
+            timestamp: timestamp || Date.now()
+          }),
+          signal: AbortSignal.timeout(15000) // 15 second timeout for Render.com cold starts
+        });
+        
+        if (aiResponse.ok) {
+          aiAnalysis = await aiResponse.json();
+          console.log('✅ AI Analysis completed successfully!');
+          console.log('AI Analysis:', JSON.stringify(aiAnalysis, null, 2));
+        } else {
+          const errorText = await aiResponse.text();
+          console.log(`⚠️ AI server returned status ${aiResponse.status}, no AI analysis available`);
+          console.log(`⚠️ AI server error response: ${errorText}`);
+        }
+      } catch (aiError) {
+        console.error('❌ AI server communication error:', aiError.message);
+        console.error('❌ Full error details:', aiError);
+        console.log(`ℹ️  Make sure AI server is running at: ${AI_SERVER_URL}`);
+      }
+      
+      // Provide fallback if no AI analysis available
+      if (!aiAnalysis) {
+        console.log('📦 Using fallback analysis (AI server not available)');
+        aiAnalysis = {
+          success: true,
+          title: `Product ${barcodeData.substring(0, 20)}`,
+          category: 'Scanned Product',
+          description: 'Product scanned successfully. Start AI server on port 8000 for detailed analysis.',
+          description_short: `Scanned: ${barcodeData.substring(0, 30)}`,
+          country: 'Unknown',
+          barcode: barcodeData,
+          deviceId: deviceId,
+          fallback: true
+        };
+      }
     }
     
     // Create scan record with AI analysis

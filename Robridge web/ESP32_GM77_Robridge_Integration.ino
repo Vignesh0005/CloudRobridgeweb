@@ -40,8 +40,8 @@ String aiServerURL = "https://robridge-ai.onrender.com";  // AI server - Render 
 String customServerIP = "";  // Custom server IP from portal
 
 // --- ESP32 Device Configuration ---
-const String deviceId = "ESP32_GM77_SCANNER_001";
-const String deviceName = "ESP32-GM77-Barcode-Scanner";
+const String deviceId = "RobridgeAI";
+const String deviceName = "RobridgeAI";
 const String firmwareVersion = "2.0.0";
 
 // --- Gemini API Configuration ---
@@ -504,13 +504,13 @@ Product analyzeProductWithAI(String scannedCode) {
   
   // Strategy 1: Try AI server directly (HTTP first)
   debugPrint("🔔 Strategy 1: Trying AI server directly...");
-  serverUrl = aiServerURL + "/scan";
+  serverUrl = aiServerURL + "/api/esp32/scan";
   http.begin(serverUrl);
   http.setTimeout(20000); // 20 second timeout for sleeping servers
   http.addHeader("Content-Type", "application/json");
   http.addHeader("User-Agent", "ESP32-Robridge/2.0");
   
-  String payload = "{\"scanned_value\":\"" + scannedCode + "\"}";
+  String payload = "{\"deviceId\":\"" + deviceId + "\",\"barcodeData\":\"" + scannedCode + "\",\"deviceName\":\"" + deviceName + "\",\"scanType\":\"GM77_SCAN\",\"timestamp\":" + String(millis()) + "}";
   debugPrint("Payload: " + payload);
   
   int httpResponseCode = http.POST(payload);
@@ -538,7 +538,7 @@ Product analyzeProductWithAI(String scannedCode) {
     secureClient.setInsecure(); // Skip certificate verification for Render.com
     secureClient.setTimeout(15000); // Reduced timeout to 15 seconds
     
-    serverUrl = aiServerURL + "/scan";
+    serverUrl = aiServerURL + "/api/esp32/scan";
     debugPrint("Attempting HTTPS connection to: " + serverUrl);
     
     if (http.begin(secureClient, serverUrl)) {
@@ -574,7 +574,7 @@ Product analyzeProductWithAI(String scannedCode) {
       
       // Strategy 3: Try alternative AI server
       debugPrint("🔔 Strategy 3: Trying alternative AI server...");
-      serverUrl = aiServerURL + "/scan";
+      serverUrl = aiServerURL + "/api/esp32/scan";
       http.begin(secureClient, serverUrl);
       http.setTimeout(30000);
       http.addHeader("Content-Type", "application/json");
@@ -603,40 +603,15 @@ Product analyzeProductWithAI(String scannedCode) {
     DeserializationError error = deserializeJson(doc, response);
     
     if (!error) {
-      // Parse AI server response format
-      if (doc["result"]) {
-        String result = doc["result"] | "No result available";
+      // Parse AI server response format (AIAnalysisResponse)
+      if (doc["title"]) {
+        String title = doc["title"] | "Unknown Product";
+        String category = doc["category"] | "Unknown";
+        String description = doc["description"] | "No description available";
         
         debugPrint("✅ AI Analysis Success!");
-        debugPrint("Result: " + result);
-        
-        // Parse the formatted result string
-        // Expected format: "Scanned Code: {code}\nTitle: {title}\nCategory: {category}\nDescription: {description}"
-        String lines[10];
-        int lineCount = 0;
-        int lastIndex = 0;
-        
-        // Split by newlines
-        for (int i = 0; i <= result.length() && lineCount < 10; i++) {
-          if (i == result.length() || result.charAt(i) == '\n') {
-            lines[lineCount] = result.substring(lastIndex, i);
-            lineCount++;
-            lastIndex = i + 1;
-          }
-        }
-        
-        // Extract information
-        String title = "Unknown Product";
-        String category = "Unknown";
-        String description = result; // Use full result as description
-        
-        for (int i = 0; i < lineCount; i++) {
-          if (lines[i].startsWith("Title: ")) {
-            title = lines[i].substring(7);
-          } else if (lines[i].startsWith("Category: ")) {
-            category = lines[i].substring(10);
-          }
-        }
+        debugPrint("Title: " + title);
+        debugPrint("Category: " + category);
         
         // Fill product info for display
         product.name = title;
@@ -646,10 +621,10 @@ Product analyzeProductWithAI(String scannedCode) {
         product.category = category;
         product.location = "Unknown";
       } else {
-        debugPrint("❌ No result in response");
+        debugPrint("❌ No title in response");
         product.name = "Scanned Code: " + scannedCode;
         product.type = "Parse Error";
-        product.details = "No result in AI server response";
+        product.details = "No title in AI server response";
         product.price = "N/A";
         product.category = "Unknown";
         product.location = "Unknown";
@@ -722,7 +697,7 @@ Product analyzeProductWithAI(String scannedCode) {
 void connectWiFi(){
   display.clearDisplay();
   displayStatusBar();
-  display.setCursor(0,10);
+  display.setCursor(0,20);
   display.println(F("Auto-connecting..."));
   display.display();
 
@@ -733,6 +708,7 @@ void connectWiFi(){
 
   if (WiFi.status() == WL_CONNECTED){       // *** SUCCESS ***
     deviceIP = WiFi.localIP().toString();
+    wifiConnected = true;                   // Set WiFi connected status
     Serial.println("\nWiFi connected (auto)");
     Serial.println("IP: " + deviceIP);
     loadServerConfig();                     // Load saved server config
@@ -745,11 +721,11 @@ void connectWiFi(){
      -------------------------------------------------------- */
   display.clearDisplay();
   displayStatusBar();
-  display.setCursor(0,10);
-  display.println(F("Manual connect"));
   display.setCursor(0,20);
-  display.println(F("AP: Robridge-Scanner"));
+  display.println(F("Manual connect"));
   display.setCursor(0,30);
+  display.println(F("AP: Robridge-Scanner"));
+  display.setCursor(0,40);
   display.println(F("PWD: rob123456"));
   display.display();
 
@@ -773,6 +749,7 @@ void connectWiFi(){
   }
 
   deviceIP = WiFi.localIP().toString();
+  wifiConnected = true;                     // Set WiFi connected status
   Serial.println("\nWiFi connected (portal)");
   Serial.println("IP: " + deviceIP);
   loadServerConfig();                       // Load saved server config
@@ -819,26 +796,27 @@ void updateServerURLs() {
 }
 
 void displayStatusBar() {
-  display.drawLine(0, 8, 127, 8, SH110X_WHITE);
+  // Move status bar down to avoid overlap with main content
+  display.drawLine(0, 10, 127, 10, SH110X_WHITE);
   // WiFi
   if (WiFi.status() == WL_CONNECTED) {
-    display.fillRect(2, 5, 2, 2, SH110X_WHITE);
-    display.fillRect(5, 3, 2, 4, SH110X_WHITE);
-    display.fillRect(8, 1, 2, 6, SH110X_WHITE);
-    display.fillRect(11, 0, 2, 7, SH110X_WHITE);
+    display.fillRect(2, 7, 2, 2, SH110X_WHITE);
+    display.fillRect(5, 5, 2, 4, SH110X_WHITE);
+    display.fillRect(8, 3, 2, 6, SH110X_WHITE);
+    display.fillRect(11, 2, 2, 7, SH110X_WHITE);
   } else {
-    display.drawLine(2, 0, 12, 7, SH110X_WHITE);
-    display.drawLine(12, 0, 2, 7, SH110X_WHITE);
+    display.drawLine(2, 2, 12, 9, SH110X_WHITE);
+    display.drawLine(12, 2, 2, 9, SH110X_WHITE);
   }
-  // Battery placeholder
-  display.drawRect(110, 1, 14, 6, SH110X_WHITE);
-  display.fillRect(124, 3, 2, 2, SH110X_WHITE);
-  display.fillRect(112, 3, 10, 2, SH110X_WHITE);
-  // Device ID
+  // Battery placeholder - moved right to avoid overlap
+  display.drawRect(115, 3, 12, 6, SH110X_WHITE);
+  display.fillRect(127, 5, 1, 2, SH110X_WHITE);
+  display.fillRect(117, 5, 8, 2, SH110X_WHITE);
+  // Device ID - smaller font to avoid overlap
   display.setTextSize(1);
   display.setTextColor(SH110X_WHITE);
-  display.setCursor(45, 0);
-  display.print(deviceId);
+  display.setCursor(30, 2);
+  display.print("RobridgeAI");
 }
 
 // Function to register with Robridge server - Enhanced connection
@@ -1180,24 +1158,27 @@ String callGeminiAPI(String barcodeData) {
   }
 }
 
-// Function to display text with proper word wrapping
+// Function to display text with scrolling capability
 void displayText(String text, int startY = 0) {
   display.clearDisplay();
+  displayStatusBar(); // Always show status bar
   display.setTextSize(1);
   display.setTextColor(SH110X_WHITE);
   
-  int y = startY;
+  // Start content below status bar (y=12)
+  int contentStartY = max(startY, 12);
+  int y = contentStartY;
   int maxCharsPerLine = 20; // Reduced to prevent overlapping
-  int maxLines = (SCREEN_HEIGHT - startY) / 8;
+  int maxLines = (SCREEN_HEIGHT - contentStartY) / 8;
   int currentLine = 0;
   
   // Split text by newlines first
-  String lines[8]; // Max 8 lines
+  String lines[20]; // Increased for scrolling
   int lineCount = 0;
   int lastIndex = 0;
   
   // Split by \n characters
-  for (int i = 0; i <= text.length() && lineCount < 8; i++) {
+  for (int i = 0; i <= text.length() && lineCount < 20; i++) {
     if (i == text.length() || text.charAt(i) == '\n') {
       lines[lineCount] = text.substring(lastIndex, i);
       lineCount++;
@@ -1205,12 +1186,15 @@ void displayText(String text, int startY = 0) {
     }
   }
   
-  // Display each line with word wrapping
-  for (int line = 0; line < lineCount && currentLine < maxLines; line++) {
+  // Process each line with word wrapping
+  String processedLines[30]; // Store all processed lines
+  int processedLineCount = 0;
+  
+  for (int line = 0; line < lineCount; line++) {
     String lineText = lines[line];
     
     // If line is too long, break it into multiple lines
-    while (lineText.length() > maxCharsPerLine && currentLine < maxLines) {
+    while (lineText.length() > maxCharsPerLine) {
       String displayLine = lineText.substring(0, maxCharsPerLine);
       
       // Try to break at a space
@@ -1222,31 +1206,199 @@ void displayText(String text, int startY = 0) {
         lineText = lineText.substring(maxCharsPerLine);
       }
       
-      display.setCursor(0, y);
-      display.println(displayLine);
-      y += 8;
-      currentLine++;
+      processedLines[processedLineCount] = displayLine;
+      processedLineCount++;
     }
     
-    // Display remaining part of line
-    if (lineText.length() > 0 && currentLine < maxLines) {
-      display.setCursor(0, y);
-      display.println(lineText);
-      y += 8;
-      currentLine++;
+    // Add remaining part of line
+    if (lineText.length() > 0) {
+      processedLines[processedLineCount] = lineText;
+      processedLineCount++;
     }
   }
   
-  display.display();
+  // If we have more lines than can fit on screen, implement scrolling
+  if (processedLineCount > maxLines) {
+    int scrollStart = 0;
+    int scrollEnd = min(processedLineCount, maxLines);
+    
+    // Show initial content
+    for (int i = scrollStart; i < scrollEnd; i++) {
+      display.setCursor(0, contentStartY + (i - scrollStart) * 8);
+      display.println(processedLines[i]);
+    }
+    display.display();
+    delay(800); // Show initial content for 0.8 seconds (much faster)
+    
+    // Scroll through the content
+    for (int scroll = 0; scroll <= processedLineCount - maxLines; scroll++) {
+      display.clearDisplay();
+      
+      for (int i = scroll; i < scroll + maxLines && i < processedLineCount; i++) {
+        display.setCursor(0, contentStartY + (i - scroll) * 8);
+        display.println(processedLines[i]);
+      }
+      
+      // Add scroll indicator
+      if (scroll < processedLineCount - maxLines) {
+        display.setCursor(120, SCREEN_HEIGHT - 8);
+        display.print("▼");
+      } else if (scroll > 0) {
+        display.setCursor(120, SCREEN_HEIGHT - 8);
+        display.print("▲");
+      }
+      
+      // Add page indicator
+      display.setCursor(110, 0);
+      display.print(String(scroll + 1) + "/" + String(processedLineCount - maxLines + 1));
+      
+      display.display();
+      delay(1000); // Show each screen for 1 second (much faster)
+    }
+  } else {
+    // Content fits on screen, display normally
+    for (int i = 0; i < processedLineCount; i++) {
+      display.setCursor(0, contentStartY + i * 8);
+      display.println(processedLines[i]);
+    }
+    display.display();
+    delay(1500); // Show for 1.5 seconds (much faster)
+  }
 }
 
-// Function to display status screen (Ready to scan)
-void displayStatusScreen() {
+// Function to display text without status bar (for clean displays) - WITH SCROLLING
+void displayTextClean(String text, int startY = 0) {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SH110X_WHITE);
-  display.setCursor(20, 30);
-  display.println("Ready to scan");
+  
+  int y = startY;
+  int maxCharsPerLine = 20; // Reduced to prevent overlapping
+  int maxLines = (SCREEN_HEIGHT - startY) / 8;
+  int currentLine = 0;
+  
+  // Split text by newlines first
+  String lines[20]; // Increased for scrolling
+  int lineCount = 0;
+  int lastIndex = 0;
+  
+  // Split by \n characters
+  for (int i = 0; i <= text.length() && lineCount < 20; i++) {
+    if (i == text.length() || text.charAt(i) == '\n') {
+      lines[lineCount] = text.substring(lastIndex, i);
+      lineCount++;
+      lastIndex = i + 1;
+    }
+  }
+  
+  // Process each line with word wrapping
+  String processedLines[30]; // Store all processed lines
+  int processedLineCount = 0;
+  
+  for (int line = 0; line < lineCount; line++) {
+    String lineText = lines[line];
+    
+    // If line is too long, break it into multiple lines
+    while (lineText.length() > maxCharsPerLine) {
+      String displayLine = lineText.substring(0, maxCharsPerLine);
+      
+      // Try to break at a space
+      int breakPoint = displayLine.lastIndexOf(' ');
+      if (breakPoint > maxCharsPerLine - 10) { // If space is not too far back
+        displayLine = lineText.substring(0, breakPoint);
+        lineText = lineText.substring(breakPoint + 1);
+      } else {
+        lineText = lineText.substring(maxCharsPerLine);
+      }
+      
+      processedLines[processedLineCount] = displayLine;
+      processedLineCount++;
+    }
+    
+    // Add remaining part of line
+    if (lineText.length() > 0) {
+      processedLines[processedLineCount] = lineText;
+      processedLineCount++;
+    }
+  }
+  
+  // If we have more lines than can fit on screen, implement scrolling
+  if (processedLineCount > maxLines) {
+    int scrollStart = 0;
+    int scrollEnd = min(processedLineCount, maxLines);
+    
+    // Show initial content
+    for (int i = scrollStart; i < scrollEnd; i++) {
+      display.setCursor(0, startY + (i - scrollStart) * 8);
+      display.println(processedLines[i]);
+    }
+    display.display();
+    delay(800); // Show initial content for 0.8 seconds (much faster)
+    
+    // Scroll through the content
+    for (int scroll = 0; scroll <= processedLineCount - maxLines; scroll++) {
+      display.clearDisplay();
+      
+      for (int i = scroll; i < scroll + maxLines && i < processedLineCount; i++) {
+        display.setCursor(0, startY + (i - scroll) * 8);
+        display.println(processedLines[i]);
+      }
+      
+      // Add scroll indicator
+      if (scroll < processedLineCount - maxLines) {
+        display.setCursor(120, SCREEN_HEIGHT - 8);
+        display.print("▼");
+      } else if (scroll > 0) {
+        display.setCursor(120, SCREEN_HEIGHT - 8);
+        display.print("▲");
+      }
+      
+      // Add page indicator
+      display.setCursor(110, 0);
+      display.print(String(scroll + 1) + "/" + String(processedLineCount - maxLines + 1));
+      
+      display.display();
+      delay(1000); // Show each screen for 1 second (much faster)
+    }
+  } else {
+    // Content fits on screen, display normally
+    for (int i = 0; i < processedLineCount; i++) {
+      display.setCursor(0, startY + i * 8);
+      display.println(processedLines[i]);
+    }
+    display.display();
+    delay(1500); // Show for 1.5 seconds (much faster)
+  }
+}
+
+// Function to display AI analysis with interactive scrolling - NO STATUS BAR
+void displayAIAnalysisWithScroll(String title, String category, String description) {
+  // Limit description to 150 characters for faster scrolling
+  String limitedDescription = description;
+  if (limitedDescription.length() > 150) {
+    limitedDescription = limitedDescription.substring(0, 147) + "...";
+  }
+  
+  // Create formatted text for display
+  String fullText = "AI ANALYSIS:\n";
+  fullText += "Title: " + title + "\n";
+  fullText += "Category: " + category + "\n";
+  fullText += "\nDescription:\n" + limitedDescription;
+  
+  displayTextClean(fullText); // Use clean display without status bar
+}
+
+// Function to display status screen (Ready to scan) - WITH status bar
+void displayStatusScreen() {
+  display.clearDisplay();
+  displayStatusBar(); // Show status bar
+  display.setTextSize(2);
+  display.setTextColor(SH110X_WHITE);
+  display.setCursor(20, 25); // Centered
+  display.println("Ready");
+  display.setTextSize(1);
+  display.setCursor(30, 45); // Centered
+  display.println("to scan");
   display.display();
 }
 
@@ -1312,8 +1464,8 @@ void displayAIAnalysisProcess(String barcodeData) {
   
   // If we got a response, show it
   if (aiResponse.length() > 0 && aiResponse != "WiFi not connected" && !aiResponse.startsWith("API Error")) {
-    displayText("AI Analysis Result:\n\n" + aiResponse);
-    delay(5000);
+    displayTextClean("AI Analysis Result:\n\n" + aiResponse);
+    delay(3000); // Faster display
   } else {
     // Show error or fallback message
     display.clearDisplay();
@@ -1558,15 +1710,8 @@ void loop() {
       Product aiProduct = analyzeProductWithAI(barcodeData);
       
       if (aiProduct.name.length() > 0) {
-        // AI successfully analyzed the product
-        String aiInfo = "AI ANALYSIS:\n";
-        aiInfo += "Name: " + aiProduct.name + "\n";
-        aiInfo += "Type: " + aiProduct.type + "\n";
-        aiInfo += "Category: " + aiProduct.category + "\n";
-        aiInfo += "\nDetails:\n" + aiProduct.details;
-        
-        displayText(aiInfo);
-        delay(8000);
+        // AI successfully analyzed the product - use scrolling display
+        displayAIAnalysisWithScroll(aiProduct.name, aiProduct.category, aiProduct.details);
         
         // Send to Robridge server with AI product info
         if (robridgeConnected) {
