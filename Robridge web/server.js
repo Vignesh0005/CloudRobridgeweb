@@ -785,17 +785,21 @@ const initBarcodesTable = () => {
   return new Promise((resolve, reject) => {
     const sql = `
       CREATE TABLE IF NOT EXISTS barcodes (
-        id TEXT PRIMARY KEY,
-        deviceId TEXT,
-        barcodeData TEXT,
-        scanType TEXT,
-        imageData TEXT,
-        timestamp TEXT,
-        processed INTEGER,
-        title TEXT,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        barcode_id TEXT,
+        barcode_data TEXT,
+        barcode_type TEXT,
+        source TEXT,
+        product_name TEXT,
+        product_id TEXT,
+        price REAL,
+        location_x REAL,
+        location_y REAL,
+        location_z REAL,
         category TEXT,
-        description TEXT,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        file_path TEXT,
+        metadata TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `;
     
@@ -859,7 +863,16 @@ app.post('/api/save-scan', (req, res) => {
   try {
     const { barcode_data, barcode_type, source, product_name, category, price, description, metadata } = req.body;
     
+    console.log('🔍 Save scan request received:', {
+      barcode_data,
+      barcode_type,
+      source,
+      product_name,
+      category
+    });
+    
     if (!barcode_data) {
+      console.log('❌ No barcode data provided');
       return res.status(400).json({
         success: false,
         error: 'Barcode data is required'
@@ -868,7 +881,9 @@ app.post('/api/save-scan', (req, res) => {
 
     // Only allow ESP32 source scans to be saved
     const sourceUpper = (source || '').toUpperCase();
+    console.log('🔍 Source check:', { source, sourceUpper, expected: 'ESP32' });
     if (sourceUpper !== 'ESP32') {
+      console.log('❌ Invalid source:', source);
       return res.status(400).json({
         success: false,
         error: 'Only ESP32 source scans can be saved.'
@@ -918,6 +933,17 @@ app.post('/api/save-scan', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
+      console.log('🔍 Attempting to save scan to database:', {
+        barcode_data,
+        barcode_type,
+        source,
+        product_name,
+        category,
+        price,
+        description,
+        metadata: JSON.stringify(metadata)
+      });
+
       db.run(sql, [
         barcode_data, 
         barcode_type, 
@@ -929,10 +955,15 @@ app.post('/api/save-scan', (req, res) => {
         JSON.stringify(metadata)
       ], function(err) {
         if (err) {
-          console.error('Error saving scan:', err);
+          console.error('❌ Error saving scan to database:', err);
+          console.error('❌ SQL Error details:', {
+            message: err.message,
+            code: err.code,
+            sql: sql
+          });
           res.status(500).json({
             success: false,
-            error: 'Failed to save scan'
+            error: 'Failed to save scan: ' + err.message
           });
         } else {
           console.log(`✅ Scan saved to saved_scans table. ID: ${this.lastID}`);

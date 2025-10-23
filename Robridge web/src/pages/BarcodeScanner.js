@@ -88,10 +88,16 @@ const BarcodeScanner = () => {
       return;
     }
 
+    console.log('🔍 Latest scan data for saving:', {
+      source: latestScan.source,
+      deviceName: latestScan.deviceName,
+      barcodeData: latestScan.barcodeData
+    });
+
     // Only allow ESP32 source scans to be saved
     const source = (latestScan.source || '').toUpperCase();
     if (source !== 'ESP32') {
-      alert('❌ Only ESP32 source scans can be saved.');
+      alert(`❌ Only ESP32 source scans can be saved. Current source: "${latestScan.source}"`);
       return;
     }
 
@@ -104,7 +110,7 @@ const BarcodeScanner = () => {
         body: JSON.stringify({
           barcode_data: latestScan.barcodeData,
           barcode_type: latestScan.scanType || 'unknown',
-          source: 'esp32',
+          source: latestScan.source || 'ESP32',
           product_name: latestScan.aiAnalysis?.title || 'Unknown Product',
           category: latestScan.aiAnalysis?.category || 'Unknown',
           price: 0,
@@ -161,7 +167,7 @@ const BarcodeScanner = () => {
         body: JSON.stringify({
           barcode_data: barcode.barcode_data,
           barcode_type: barcode.barcode_type || 'ESP32_SCAN',
-          source: barcode.source || 'esp32',
+          source: 'ESP32',
           product_name: barcode.product_name || 'Unknown Product',
           category: barcode.category || 'Unknown',
           price: barcode.price || 0,

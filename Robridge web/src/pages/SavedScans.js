@@ -17,12 +17,13 @@ const SavedScans = () => {
     setLoading(true);
     try {
       console.log('Fetching saved scans from API...');
-      const response = await fetch('https://robridge-express.onrender.com/api/saved-scans');
+      // Use the barcodes/scanned endpoint instead of saved-scans to get ESP32 scans
+      const response = await fetch('https://robridge-express.onrender.com/api/barcodes/scanned?limit=1000');
       const data = await response.json();
       console.log('Saved scans API Response:', data);
       
       if (data.success) {
-        const scans = data.savedScans || [];
+        const scans = data.barcodes || [];
         console.log('📊 Total saved scans loaded:', scans.length);
         
         // Debug: Show breakdown of scan types and sources
@@ -83,7 +84,7 @@ const SavedScans = () => {
     }
 
     try {
-      const response = await fetch(`'https://robridge-express.onrender.com'/api/saved-scans/${scanId}`, {
+      const response = await fetch(`https://robridge-express.onrender.com/api/barcodes/${scanId}`, {
         method: 'DELETE',
       });
 
@@ -103,9 +104,9 @@ const SavedScans = () => {
 
   // Filter saved scans based on search term and type
   const filteredSavedScans = savedScans.filter(scan => {
-    // Only show scans with source = "ESP32" (case-insensitive)
-    const source = (scan.source || '').toUpperCase();
-    if (source !== 'ESP32') {
+    // Show all ESP32 scans (source = "esp32" or "ESP32")
+    const source = (scan.source || '').toLowerCase();
+    if (source !== 'esp32') {
       return false;
     }
 
@@ -135,18 +136,8 @@ const SavedScans = () => {
     }
 
     try {
-      const response = await fetch('https://robridge-express.onrender.com/api/saved-scans', {
-        method: 'DELETE',
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setSavedScans([]);
-        alert(`✅ Cleared ${result.deletedCount} saved scans successfully!`);
-      } else {
-        alert('❌ Failed to clear saved scans: ' + result.error);
-      }
+      // Note: There's no bulk delete endpoint for barcodes table, so we'll skip this for now
+      alert('⚠️ Bulk delete is not available for ESP32 scans. Please delete individual scans.');
     } catch (error) {
       console.error('Error clearing saved scans:', error);
       alert('❌ Error clearing saved scans. Please try again.');
@@ -174,8 +165,8 @@ const SavedScans = () => {
           }
           return scan.category || 'N/A';
         })(),
-        new Date(scan.scanned_at || scan.created_at).toLocaleString(),
-        new Date(scan.saved_at || scan.created_at).toLocaleString()
+        new Date(scan.created_at).toLocaleString(),
+        new Date(scan.created_at).toLocaleString()
       ])
     ].map(row => row.join(',')).join('\n');
 
@@ -321,7 +312,7 @@ const SavedScans = () => {
                       })()}
                     </td>
                     <td className="scan-date">
-                      {new Date(scan.created_at || scan.scanned_at).toLocaleString()}
+                      {new Date(scan.created_at).toLocaleString()}
                     </td>
                     <td className="action-cell">
                       <button

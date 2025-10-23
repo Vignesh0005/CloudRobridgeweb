@@ -87,8 +87,9 @@ export const WebSocketProvider = ({ children }) => {
       scanType: scanData.scanType
     });
     
-    // Only process ESP32 scans - check by deviceName since ESP32 sends "Scanner" in name
+    // Only process ESP32 scans - check by deviceName and source
     const isEsp32Device = scanData.deviceName?.includes('Scanner') || 
+                         scanData.deviceName?.includes('RobridgeAI') ||
                          scanData.source === 'esp32' || 
                          scanData.source === 'ESP32_LIVE_SCANNER';
     
@@ -124,6 +125,7 @@ export const WebSocketProvider = ({ children }) => {
           const completeScan = {
             ...currentBuffer,
             timestamp: currentBuffer.timestamp || Date.now(),
+            source: 'ESP32', // Ensure source is set to ESP32 for saving
             aiAnalysis: currentBuffer.aiAnalysis, // Explicitly include AI analysis
             dbRecord: currentBuffer.productInfo ? {
               id: currentBuffer.barcodeData,
