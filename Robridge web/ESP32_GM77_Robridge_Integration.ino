@@ -1684,56 +1684,71 @@ void loop() {
       Serial.print("Clean Barcode: ");
       Serial.println(barcodeData);
 
-      // Show AI Analysis message briefly
-      display.clearDisplay();
-      display.setTextSize(1);
-      display.setTextColor(SH110X_WHITE);
-      display.setCursor(0, 0);
-      display.println("AI Analysis...");
-      display.println("");
-      display.println("Processing barcode:");
-      display.println(barcodeData);
-      display.display();
-      delay(2000); // Show AI Analysis for 2 seconds
-
-      // Direct AI analysis - skip database lookup
-      display.clearDisplay();
-      display.setTextSize(1);
-      display.setTextColor(SH110X_WHITE);
-      display.setCursor(0, 0);
-      display.println("Analyzing with AI...");
-      display.println("Barcode: " + barcodeData);
-      display.display();
-      delay(2000);
+      // Check if device name contains "AI" for AI analysis
+      bool hasAI = deviceName.indexOf("AI") >= 0;
       
-      // Analyze with AI model directly
-      Product aiProduct = analyzeProductWithAI(barcodeData);
-      
-      if (aiProduct.name.length() > 0) {
-        // AI successfully analyzed the product - use scrolling display
-        displayAIAnalysisWithScroll(aiProduct.name, aiProduct.category, aiProduct.details);
-        
-        // Send to Robridge server with AI product info
-        if (robridgeConnected) {
-          sendScanToRobridge(barcodeData, &aiProduct);
-        }
-      } else {
-        // AI analysis failed - show basic info
+      if (hasAI) {
+        // Show AI Analysis message briefly
         display.clearDisplay();
         display.setTextSize(1);
         display.setTextColor(SH110X_WHITE);
         display.setCursor(0, 0);
-        display.println("Scanned Code:");
-        display.println(barcodeData);
+        display.println("AI Analysis...");
         display.println("");
-        display.println("AI analysis failed");
-        display.println("Code recorded");
+        display.println("Processing barcode:");
+        display.println(barcodeData);
         display.display();
-        delay(3000);
+        delay(2000); // Show AI Analysis for 2 seconds
+
+        // Direct AI analysis - skip database lookup
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setTextColor(SH110X_WHITE);
+        display.setCursor(0, 0);
+        display.println("Analyzing with AI...");
+        display.println("Barcode: " + barcodeData);
+        display.display();
+        delay(2000);
         
-        // Send to Robridge server anyway
+        // Analyze with AI model directly
+        Product aiProduct = analyzeProductWithAI(barcodeData);
+        
+        if (aiProduct.name.length() > 0) {
+          // AI successfully analyzed the product - use scrolling display
+          displayAIAnalysisWithScroll(aiProduct.name, aiProduct.category, aiProduct.details);
+          
+          // Send to Robridge server with AI product info
+          if (robridgeConnected) {
+            sendScanToRobridge(barcodeData, &aiProduct);
+          }
+        } else {
+          // AI analysis failed - show basic info
+          displayBasicScanInfo(barcodeData);
+          
+          // Send basic scan to Robridge server
+          if (robridgeConnected) {
+            sendBasicScanToRobridge(barcodeData);
+          }
+        }
+      } else {
+        // Device doesn't have "AI" in name - show basic processing
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setTextColor(SH110X_WHITE);
+        display.setCursor(0, 0);
+        display.println("Basic Scan");
+        display.println("");
+        display.println("Processing barcode:");
+        display.println(barcodeData);
+        display.display();
+        delay(2000);
+        
+        // Show basic scan info without AI
+        displayBasicScanInfo(barcodeData);
+        
+        // Send basic scan to Robridge server
         if (robridgeConnected) {
-          sendScanToRobridge(barcodeData, nullptr);
+          sendBasicScanToRobridge(barcodeData);
         }
       }
 
@@ -1746,4 +1761,60 @@ void loop() {
       displayStatusScreen();
     }
   }
+}
+
+// Function to display basic scan info without AI analysis
+void displayBasicScanInfo(String barcodeData) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SH110X_WHITE);
+  display.setCursor(0, 0);
+  display.println("Basic Scan Result");
+  display.println("");
+  display.println("Barcode: " + barcodeData);
+  display.println("");
+  display.println("No AI analysis");
+  display.println("Basic processing");
+  display.display();
+  delay(3000);
+}
+
+// Function to send basic scan data to Robridge server (without AI analysis)
+void sendBasicScanToRobridge(String barcodeData) {
+  if (!robridgeConnected) {
+    debugPrint("Robridge not connected, skipping basic scan send");
+    return;
+  }
+
+  String serverUrl = expressServerURL + "/api/esp32/scan/" + deviceId;
+  
+  // Create JSON payload for basic scan (no AI analysis)
+  String jsonString = "{";
+  jsonString += "\"barcodeData\":\"" + barcodeData + "\",";
+  jsonString += "\"scanType\":\"basic_scan\",";
+  jsonString += "\"timestamp\":" + String(millis()) + ",";
+  jsonString += "\"source\":\"esp32_basic\",";
+  jsonString += "\"productName\":\"Unknown Product\",";
+  jsonString += "\"productType\":\"Unknown\",";
+  jsonString += "\"productDetails\":\"Basic scan without AI analysis\",";
+  jsonString += "\"productCategory\":\"Unknown\"";
+  jsonString += "}";
+
+  debugPrint("Sending basic scan to Robridge: " + jsonString);
+
+  HTTPClient http;
+  http.begin(serverUrl);
+  http.addHeader("Content-Type", "application/json");
+  
+  int httpResponseCode = http.POST(jsonString);
+  
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    debugPrint("Basic scan response: " + String(httpResponseCode) + " - " + response);
+    lastApiResponse = response;
+  } else {
+    debugPrint("Basic scan failed: " + String(httpResponseCode));
+  }
+  
+  http.end();
 }

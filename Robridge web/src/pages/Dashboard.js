@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  FaBarcode, 
-  FaQrcode, 
-  FaImage, 
+  FaBarcode,
+  FaQrcode,
+  FaImage,
   FaRobot,
   FaDatabase,
   FaChartLine,
   FaWarehouse,
-  FaBox
+  FaBox,
+  FaWifi,
+  FaServer
 } from 'react-icons/fa';
 import { useAuth, ROLES } from '../contexts/AuthContext';
 import './Dashboard.css';
@@ -16,6 +18,8 @@ import './Dashboard.css';
 const Dashboard = () => {
   const { getUserRole } = useAuth();
   const userRole = getUserRole();
+  const [systemStatus, setSystemStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
   const stats = [
     { label: 'Total Scans', value: '1,247', icon: FaBarcode, color: '#E3821E' },
     { label: 'Generated Codes', value: '892', icon: FaQrcode, color: '#E3821E' },
@@ -68,12 +72,65 @@ const Dashboard = () => {
     }
   ];
 
-  const recentActivity = [
-    { action: 'Barcode scanned', detail: 'Product ID: PRD-001', time: '2 min ago', type: 'scan' },
-    { action: 'Barcode generated', detail: 'Order #12345', time: '15 min ago', type: 'generate' },
-    { action: 'Image processed', detail: 'enhanced_photo.jpg', time: '1 hour ago', type: 'image' },
-    { action: 'Map updated', detail: 'LiDAR data refreshed', time: '2 hours ago', type: 'robot' }
-  ];
+  // Fetch system status
+  useEffect(() => {
+    const fetchSystemStatus = async () => {
+      try {
+        setLoading(true);
+        const serverURL = 'https://robridge-express.onrender.com';
+        const response = await fetch(`${serverURL}/api/system/status`);
+        const data = await response.json();
+        
+        if (data.success) {
+          setSystemStatus(data.status);
+        } else {
+          console.error('Failed to fetch system status:', data.error);
+        }
+      } catch (error) {
+        console.error('Error fetching system status:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSystemStatus();
+    
+    // Refresh status every 30 seconds
+    const interval = setInterval(fetchSystemStatus, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Helper function to get status class
+  const getStatusClass = (status) => {
+    switch (status) {
+      case 'connected':
+      case 'optimal':
+        return 'status-connected';
+      case 'warning':
+        return 'status-warning';
+      case 'error':
+        return 'status-error';
+      default:
+        return 'status-unknown';
+    }
+  };
+
+  // Helper function to get status text
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'connected':
+        return 'Connected';
+      case 'optimal':
+        return 'Optimal';
+      case 'warning':
+        return 'Warning';
+      case 'error':
+        return 'Error';
+      default:
+        return 'Unknown';
+    }
+  };
 
   return (
     <div className="dashboard">
@@ -128,60 +185,91 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Recent Activity */}
-        <div className="dashboard-section">
-          <h2>Recent Activity</h2>
-          <div className="activity-list">
-            {recentActivity.map((activity, index) => (
-              <div key={index} className="activity-item">
-                <div className="activity-icon">
-                  {activity.type === 'scan' && <FaBarcode />}
-                  {activity.type === 'generate' && <FaQrcode />}
-                  {activity.type === 'image' && <FaImage />}
-                  {activity.type === 'robot' && <FaRobot />}
-                </div>
-                <div className="activity-content">
-                  <div className="activity-action">{activity.action}</div>
-                  <div className="activity-detail">{activity.detail}</div>
-                </div>
-                <div className="activity-time">{activity.time}</div>
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* System Status */}
         <div className="dashboard-section">
           <h2>System Status</h2>
-          <div className="status-grid">
-            <div className="status-card">
-              <div className="status-header">
-                <FaDatabase />
-                <span>Database</span>
+          {loading ? (
+            <div className="status-loading">
+              <p>Loading system status...</p>
+            </div>
+          ) : systemStatus ? (
+            <div className="status-grid">
+              <div className="status-card">
+                <div className="status-header">
+                  <FaDatabase />
+                  <span>Database</span>
+                </div>
+                <div className={`status-indicator ${getStatusClass(systemStatus.database.status)}`}>
+                  {getStatusText(systemStatus.database.status)}
+                </div>
+                <div className="status-detail">
+                  {systemStatus.database.message}
+                </div>
               </div>
-              <div className="status-indicator status-connected">
-                Connected
+              
+              <div className="status-card">
+                <div className="status-header">
+                  <FaServer />
+                  <span>AI Server</span>
+                </div>
+                <div className={`status-indicator ${getStatusClass(systemStatus.aiServer.status)}`}>
+                  {getStatusText(systemStatus.aiServer.status)}
+                </div>
+                <div className="status-detail">
+                  {systemStatus.aiServer.message}
+                </div>
+              </div>
+              
+              <div className="status-card">
+                <div className="status-header">
+                  <FaRobot />
+                  <span>ESP32 Devices</span>
+                </div>
+                <div className={`status-indicator ${getStatusClass(systemStatus.esp32Devices.status)}`}>
+                  {getStatusText(systemStatus.esp32Devices.status)}
+                </div>
+                <div className="status-detail">
+                  {systemStatus.esp32Devices.message}
+                </div>
+              </div>
+              
+              <div className="status-card">
+                <div className="status-header">
+                  <FaWifi />
+                  <span>WebSocket</span>
+                </div>
+                <div className={`status-indicator ${getStatusClass(systemStatus.websocket.status)}`}>
+                  {getStatusText(systemStatus.websocket.status)}
+                </div>
+                <div className="status-detail">
+                  {systemStatus.websocket.message}
+                </div>
+              </div>
+              
+              <div className="status-card">
+                <div className="status-header">
+                  <FaChartLine />
+                  <span>Performance</span>
+                </div>
+                <div className={`status-indicator ${getStatusClass(systemStatus.performance.status)}`}>
+                  {getStatusText(systemStatus.performance.status)}
+                </div>
+                <div className="status-detail">
+                  {systemStatus.performance.message}
+                  {systemStatus.performance.metrics && (
+                    <div className="performance-metrics">
+                      <small>Memory: {systemStatus.performance.metrics.memoryUsage}% | Uptime: {Math.floor(systemStatus.performance.metrics.uptime / 3600)}h</small>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="status-card">
-              <div className="status-header">
-                <FaRobot />
-                <span>Robot</span>
-              </div>
-              <div className="status-indicator status-warning">
-                Standby
-              </div>
+          ) : (
+            <div className="status-error">
+              <p>Failed to load system status</p>
             </div>
-            <div className="status-card">
-              <div className="status-header">
-                <FaChartLine />
-                <span>Performance</span>
-              </div>
-              <div className="status-indicator status-connected">
-                Optimal
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

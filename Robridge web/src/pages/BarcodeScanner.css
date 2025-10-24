@@ -1330,13 +1330,15 @@
 /* Dialog Content Sections - Matching SavedScans.css */
 .scan-info-section,
 .barcode-data-section,
-.description-section {
+.description-section,
+.ai-analysis-section {
   margin-bottom: 24px;
 }
 
 .scan-info-section h3,
 .barcode-data-section h3,
-.description-section h3 {
+.description-section h3,
+.ai-analysis-section h3 {
   font-size: 18px;
   color: #3D3E41;
   margin: 0 0 16px 0;
@@ -1349,7 +1351,8 @@
 
 .scan-info-section h3::before,
 .barcode-data-section h3::before,
-.description-section h3::before {
+.description-section h3::before,
+.ai-analysis-section h3::before {
   content: '';
   width: 4px;
   height: 18px;
@@ -1519,5 +1522,174 @@
   
   .product-field:not(:last-child) {
     padding-bottom: 8px;
+  }
+}
+
+/* AI Analysis Results Styles - Exact Match to Image */
+.ai-analysis-section h3 {
+  background: #1A73E8;
+  color: white;
+  padding: 12px 16px;
+  margin: 0 0 0 0;
+  border-radius: 8px 8px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-analysis-container {
+  background: #F8F9FA;
+  border: 1px solid #E8EAED;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  padding: 0;
+}
+
+.ai-analysis-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border-bottom: 1px solid #E8EAED;
+}
+
+.ai-analysis-field:last-child {
+  border-bottom: none;
+}
+
+.ai-analysis-field label {
+  font-weight: 600;
+  color: #3D3E41;
+  font-size: 14px;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ai-analysis-value {
+  color: #5F6368;
+  font-size: 14px;
+  background: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #DADCE0;
+  font-weight: 500;
+}
+
+.ai-analysis-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #137333;
+  font-weight: 600;
+  font-size: 14px;
+  background: #E6F4EA;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #CEEAD6;
+}
+
+.status-icon {
+  color: #137333;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.ai-analysis-description-text {
+  color: #5F6368;
+  font-size: 14px;
+  line-height: 1.6;
+  background: white;
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid #DADCE0;
+  min-height: 100px;
+  white-space: pre-wrap;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Basic Analysis Styles */
+.basic-analysis-section {
+  margin-top: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  border-radius: 12px;
+  color: white;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+}
+
+.basic-analysis-section h3 {
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.basic-analysis-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.basic-analysis-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.basic-analysis-field label {
+  font-weight: 600;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.basic-analysis-value {
+  font-size: 16px;
+  font-weight: 500;
+  color: white;
+  word-break: break-word;
+}
+
+.basic-analysis-description-text {
+  color: #5F6368;
+  font-size: 14px;
+  line-height: 1.6;
+  background: white;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 8px;
+  border: 1px solid #E8EAED;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Responsive Design for AI Analysis */
+@media (max-width: 768px) {
+  .ai-analysis-field {
+    padding: 12px;
+  }
+  
+  .ai-analysis-section h3 {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  
+  .basic-analysis-field {
+    padding: 12px;
+  }
+  
+  .basic-analysis-section h3 {
+    padding: 10px 12px;
+    font-size: 14px;
   }
 }

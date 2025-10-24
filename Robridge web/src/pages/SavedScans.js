@@ -17,13 +17,13 @@ const SavedScans = () => {
     setLoading(true);
     try {
       console.log('Fetching saved scans from API...');
-      // Use the barcodes/scanned endpoint instead of saved-scans to get ESP32 scans
-      const response = await fetch('https://robridge-express.onrender.com/api/barcodes/scanned?limit=1000');
+      // Use the saved-scans endpoint to get only manually saved scans
+      const response = await fetch('https://robridge-express.onrender.com/api/saved-scans');
       const data = await response.json();
       console.log('Saved scans API Response:', data);
       
       if (data.success) {
-        const scans = data.barcodes || [];
+        const scans = data.savedScans || [];
         console.log('📊 Total saved scans loaded:', scans.length);
         
         // Debug: Show breakdown of scan types and sources
@@ -84,7 +84,7 @@ const SavedScans = () => {
     }
 
     try {
-      const response = await fetch(`https://robridge-express.onrender.com/api/barcodes/${scanId}`, {
+      const response = await fetch(`https://robridge-express.onrender.com/api/saved-scans/${scanId}`, {
         method: 'DELETE',
       });
 
@@ -104,9 +104,9 @@ const SavedScans = () => {
 
   // Filter saved scans based on search term and type
   const filteredSavedScans = savedScans.filter(scan => {
-    // Show all ESP32 scans (source = "esp32" or "ESP32")
-    const source = (scan.source || '').toLowerCase();
-    if (source !== 'esp32') {
+    // Show all ESP32 scans (source = "ESP32")
+    const source = (scan.source || '').toUpperCase();
+    if (source !== 'ESP32') {
       return false;
     }
 
@@ -136,8 +136,17 @@ const SavedScans = () => {
     }
 
     try {
-      // Note: There's no bulk delete endpoint for barcodes table, so we'll skip this for now
-      alert('⚠️ Bulk delete is not available for ESP32 scans. Please delete individual scans.');
+      const response = await fetch('https://robridge-express.onrender.com/api/saved-scans/clear', {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        setSavedScans([]);
+        alert('✅ All saved scans cleared successfully!');
+      } else {
+        const errorData = await response.json();
+        alert('❌ Error clearing saved scans: ' + (errorData.error || 'Unknown error'));
+      }
     } catch (error) {
       console.error('Error clearing saved scans:', error);
       alert('❌ Error clearing saved scans. Please try again.');
@@ -152,7 +161,7 @@ const SavedScans = () => {
         scan.id,
         scan.barcode_data,
         scan.barcode_type || 'N/A',
-        scan.source,
+        scan.source === 'ESP32' ? 'RobridgeAI' : scan.source,
         (() => {
           // Try to get AI analysis category from metadata
           try {
@@ -165,8 +174,20 @@ const SavedScans = () => {
           }
           return scan.category || 'N/A';
         })(),
-        new Date(scan.created_at).toLocaleString(),
-        new Date(scan.created_at).toLocaleString()
+        new Date(scan.saved_at || scan.created_at).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        new Date(scan.saved_at || scan.created_at).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
       ])
     ].map(row => row.join(',')).join('\n');
 
@@ -294,7 +315,7 @@ const SavedScans = () => {
                     </td>
                     <td className="scan-source">
                       <span className={`source-badge source-${scan.source}`}>
-                        {scan.source?.toUpperCase() || 'UNKNOWN'}
+                        {scan.source === 'ESP32' ? 'RobridgeAI' : (scan.source?.toUpperCase() || 'UNKNOWN')}
                       </span>
                     </td>
                     <td className="scan-category">
@@ -312,7 +333,13 @@ const SavedScans = () => {
                       })()}
                     </td>
                     <td className="scan-date">
-                      {new Date(scan.created_at).toLocaleString()}
+                      {new Date(scan.saved_at || scan.created_at).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
                     </td>
                     <td className="action-cell">
                       <button

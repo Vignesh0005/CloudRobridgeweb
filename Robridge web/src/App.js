@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import Navigation from './components/Navigation';
 import Dashboard from './pages/Dashboard';
 import BarcodeScanner from './pages/BarcodeScanner';
+import ScannedBarcodes from './pages/ScannedBarcodes';
 import BarcodeGenerator from './pages/BarcodeGenerator';
 import ImageProcessing from './pages/ImageProcessing';
 import RobotControl from './pages/RobotControl';
@@ -14,6 +15,7 @@ import RackManagement from './pages/RackManagement';
 import ProductManagement from './pages/ProductManagement';
 import DeviceConnected from './pages/DeviceConnected';
 import SavedScans from './pages/SavedScans';
+import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import './App.css';
 
@@ -91,6 +93,11 @@ function AppContent() {
               <BarcodeScanner />
             </ProtectedRoute>
           } />
+          <Route path="/scanned-barcodes" element={
+            <ProtectedRoute requiredPath="/scanned-barcodes">
+              <ScannedBarcodes />
+            </ProtectedRoute>
+          } />
           <Route path="/generator" element={
             <ProtectedRoute requiredPath="/generator">
               <BarcodeGenerator />
@@ -129,6 +136,11 @@ function AppContent() {
           <Route path="/saved-scans" element={
             <ProtectedRoute requiredPath="/saved-scans">
               <SavedScans />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute requiredPath="/profile">
+              <Profile />
             </ProtectedRoute>
           } />
           <Route path="/settings" element={

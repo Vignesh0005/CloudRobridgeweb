@@ -17,7 +17,8 @@ import {
   FaUser,
   FaShieldAlt,
   FaCrown,
-  FaSave
+  FaSave,
+  FaUserCircle
 } from 'react-icons/fa';
 import { useAuth, ROLES } from '../contexts/AuthContext';
 import './Navigation.css';
@@ -46,6 +47,7 @@ const Navigation = () => {
   const allNavItems = [
     { path: '/', icon: FaHome, label: 'Dashboard', roles: [ROLES.ADMIN, ROLES.EXPO_USER, ROLES.FULL_ACCESS] },
     { path: '/scanner', icon: FaBarcode, label: 'Barcode Scanner', roles: [ROLES.ADMIN, ROLES.EXPO_USER, ROLES.FULL_ACCESS] },
+    { path: '/scanned-barcodes', icon: FaBarcode, label: 'Scanned Barcodes', roles: [ROLES.ADMIN, ROLES.EXPO_USER, ROLES.FULL_ACCESS] },
     { path: '/generator', icon: FaQrcode, label: 'Barcode Generator', roles: [ROLES.ADMIN, ROLES.FULL_ACCESS] },
     { path: '/saved-scans', icon: FaSave, label: 'Saved Scans', roles: [ROLES.ADMIN, ROLES.EXPO_USER, ROLES.FULL_ACCESS] },
     { path: '/image-processing', icon: FaImage, label: 'Image Processing', roles: [ROLES.ADMIN, ROLES.FULL_ACCESS] },
@@ -54,6 +56,7 @@ const Navigation = () => {
     { path: '/rack-management', icon: FaWarehouse, label: 'Rack Management', roles: [ROLES.ADMIN, ROLES.FULL_ACCESS] },
     { path: '/product-management', icon: FaBox, label: 'Product Management', roles: [ROLES.ADMIN, ROLES.FULL_ACCESS] },
     { path: '/device-connected', icon: FaWifi, label: 'Device Connected', roles: [ROLES.ADMIN, ROLES.EXPO_USER, ROLES.FULL_ACCESS] },
+    { path: '/profile', icon: FaUserCircle, label: 'Profile', roles: [ROLES.EXPO_USER] },
     { path: '/settings', icon: FaCog, label: 'Settings', roles: [ROLES.ADMIN, ROLES.FULL_ACCESS] }
   ];
 
@@ -121,25 +124,6 @@ const Navigation = () => {
         </ul>
 
         <div className="nav-footer">
-        {!isCollapsed && user && (
-          <div className="user-info">
-            <div className="user-avatar">
-              {userRole === ROLES.EXPO_USER && <FaUser />}
-              {userRole === ROLES.ADMIN && <FaShieldAlt />}
-              {userRole === ROLES.FULL_ACCESS && <FaCrown />}
-            </div>
-            <div className="user-details">
-              <div className="user-name">{user.name}</div>
-              <div className="user-email">{user.email}</div>
-              <div className="user-role">
-                {userRole === ROLES.EXPO_USER && 'Expo User'}
-                {userRole === ROLES.ADMIN && 'Administrator'}
-                {userRole === ROLES.FULL_ACCESS && 'Full Access'}
-              </div>
-            </div>
-          </div>
-        )}
-        
         <button 
           className="logout-btn"
           onClick={handleLogout}

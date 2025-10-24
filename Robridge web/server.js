@@ -20,7 +20,7 @@ const PORT = process.env.PORT || 3001;
 const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-console.log('🚀 Server Configuration:');
+console.log('Server Configuration:');
 console.log(`   PORT: ${PORT}`);
 console.log(`   AI_SERVER_URL: ${AI_SERVER_URL}`);
 console.log(`   NODE_ENV: ${NODE_ENV}`);

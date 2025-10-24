@@ -252,6 +252,26 @@ async def esp32_scan(data: ESP32ScanInput):
         logger.info(f"ESP32 scan received from {data.deviceId}: {data.barcodeData}")
         logger.info(f"Additional data - deviceName: {data.deviceName}, scanType: {data.scanType}, timestamp: {data.timestamp}")
         
+        # Check if device name contains "AI" for AI analysis
+        device_name = data.deviceName or ""
+        has_ai = "AI" in device_name.upper()
+        
+        logger.info(f"Device name: '{device_name}', Contains AI: {has_ai}")
+        
+        if not has_ai:
+            # Device doesn't have "AI" in name - return basic analysis
+            logger.info("Device does not have 'AI' in name - returning basic analysis")
+            return AIAnalysisResponse(
+                success=True,
+                title="Basic Scan",
+                category="Basic Product",
+                description="Basic scan without AI analysis. Device does not support AI processing.",
+                description_short="Basic scan - no AI analysis",
+                country="Unknown",
+                barcode=data.barcodeData,
+                deviceId=data.deviceId
+            )
+        
         # Case 1: Numeric barcode
         if re.fullmatch(r"\d{8,14}", data.barcodeData):
             country = get_country_from_barcode(data.barcodeData)

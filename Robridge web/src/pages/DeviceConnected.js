@@ -277,6 +277,10 @@ const DeviceConnected = () => {
                   <FaCog />
                   <span>Firmware: {device.firmwareVersion}</span>
                 </div>
+                <div className="detail-row">
+                  <FaMicrochip />
+                  <span>AI Capability: {device.deviceName && device.deviceName.toUpperCase().includes('AI') ? 'Enabled' : 'Disabled'}</span>
+                </div>
               </div>
 
               <div className="device-metrics">
