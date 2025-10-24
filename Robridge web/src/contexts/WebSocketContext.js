@@ -90,7 +90,10 @@ export const WebSocketProvider = ({ children }) => {
     // Only process ESP32 scans - check by deviceName and source
     const isEsp32Device = scanData.deviceName?.includes('Scanner') || 
                          scanData.deviceName?.includes('RobridgeAI') ||
+                         scanData.deviceName?.includes('Robridge') ||  // Added support for "Robridge" devices
+                         scanData.deviceName?.includes('ESP32-') ||  // Added support for auto-registered devices
                          scanData.source === 'esp32' || 
+                         scanData.source === 'esp32_basic' ||  // Added support for basic scans
                          scanData.source === 'ESP32_LIVE_SCANNER';
     
     if (!isEsp32Device) {

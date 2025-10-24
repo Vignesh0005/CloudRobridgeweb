@@ -77,7 +77,7 @@ const RackManagement = () => {
       if (filterStatus !== 'all') params.append('status', filterStatus);
       
       console.log('Loading racks with params:', params.toString());
-      const response = await fetch(`'https://robridge-express.onrender.com'/api/racks?${params.toString()}`);
+      const response = await fetch(`https://robridge-express.onrender.com/api/racks?${params.toString()}`);
       console.log('Racks response status:', response.status);
       
       if (!response.ok) {
@@ -229,7 +229,7 @@ const RackManagement = () => {
     setIsSaving(true);
     
     try {
-      const response = await fetch(`'https://robridge-express.onrender.com'/api/racks/${editingRack.id}`, {
+      const response = await fetch(`https://robridge-express.onrender.com/api/racks/${editingRack.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -259,7 +259,7 @@ const RackManagement = () => {
   const handleDeleteRack = async (rackId) => {
     if (window.confirm('Are you sure you want to delete this rack?')) {
       try {
-        const response = await fetch(`'https://robridge-express.onrender.com'/api/racks/${rackId}`, {
+        const response = await fetch(`https://robridge-express.onrender.com/api/racks/${rackId}`, {
           method: 'DELETE'
         });
         
@@ -294,7 +294,7 @@ const RackManagement = () => {
 
     setIsSearching(true);
     try {
-      const response = await fetch(`'https://robridge-express.onrender.com'/api/racks/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      const response = await fetch(`https://robridge-express.onrender.com/api/racks/search?q=${encodeURIComponent(searchQuery.trim())}`);
       const data = await response.json();
       
       if (data.success) {

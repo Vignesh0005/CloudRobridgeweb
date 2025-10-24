@@ -137,6 +137,42 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// System status endpoint for Dashboard
+app.get('/api/system/status', (req, res) => {
+  try {
+    const devices = Array.from(esp32Devices.values());
+    const connectedDevices = devices.filter(device => device.status === 'connected');
+    const totalScans = devices.reduce((sum, device) => sum + (device.totalScans || 0), 0);
+    
+    const systemStatus = {
+      server: 'online',
+      database: 'connected',
+      devices: {
+        total: devices.length,
+        connected: connectedDevices.length,
+        disconnected: devices.length - connectedDevices.length
+      },
+      scans: {
+        total: totalScans,
+        today: totalScans // Simplified - could be enhanced with date filtering
+      },
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json({
+      success: true,
+      status: systemStatus
+    });
+  } catch (error) {
+    console.error('Error getting system status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get system status'
+    });
+  }
+});
+
 // Simple health endpoint for convenience
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

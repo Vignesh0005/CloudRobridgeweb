@@ -264,32 +264,7 @@ const BarcodeScanner = () => {
                       </div>
                     );
                   } else {
-                    return (
-                      <div className="basic-analysis-section">
-                        <h3>📋 Basic Scan Results</h3>
-                        <div className="basic-analysis-container">
-                          <div className="basic-analysis-field">
-                            <label>Device Type:</label>
-                            <span className="basic-analysis-value">Basic Scanner (No AI)</span>
-                          </div>
-                          
-                          <div className="basic-analysis-field">
-                            <label>Raw Data:</label>
-                            <span className="basic-analysis-value">
-                              {latestScan.barcodeData || 'No data available'}
-                            </span>
-                          </div>
-                          
-                          <div className="basic-analysis-field">
-                            <label>Description:</label>
-                            <div className="basic-analysis-description-text">
-                              This device does not support AI analysis. Only raw barcode data is available. 
-                              To enable AI features, rename the device to include "AI" in the name (e.g., "RobridgeAI").
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
+                    return null; // Remove the Basic Scan Results section entirely
                   }
                 })()}
               </div>
