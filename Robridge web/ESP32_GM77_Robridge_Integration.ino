@@ -1686,6 +1686,8 @@ void loop() {
 
       // Check if device name contains "AI" for AI analysis
       bool hasAI = deviceName.indexOf("AI") >= 0;
+      debugPrint("Device name: " + deviceName);
+      debugPrint("Has AI capability: " + String(hasAI ? "YES" : "NO"));
       
       if (hasAI) {
         // Show AI Analysis message briefly
@@ -1773,6 +1775,7 @@ void displayBasicScanInfo(String barcodeData) {
   display.println("");
   display.println("Barcode: " + barcodeData);
   display.println("");
+  display.println("Device: " + deviceName);
   display.println("No AI analysis");
   display.println("Basic processing");
   display.display();

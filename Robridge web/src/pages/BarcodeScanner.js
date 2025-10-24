@@ -211,10 +211,10 @@ const BarcodeScanner = () => {
                   </div>
                 </div>
 
-                {/* AI Analysis Results Section - Only show for devices with "AI" in name */}
+                {/* Conditional Analysis Results Section - AI vs Basic based on device name */}
                 {(() => {
                   const deviceName = latestScan.deviceName || '';
-                  const hasAI = deviceName.toUpperCase().includes('AI');
+                  const hasAI = deviceName && typeof deviceName === 'string' && deviceName.toUpperCase().includes('AI');
                   
                   if (hasAI) {
                     return (
@@ -274,16 +274,17 @@ const BarcodeScanner = () => {
                           </div>
                           
                           <div className="basic-analysis-field">
-                            <label>Analysis:</label>
+                            <label>Raw Data:</label>
                             <span className="basic-analysis-value">
-                              {latestScan.aiAnalysis?.title || 'Basic scan without AI analysis'}
+                              {latestScan.barcodeData || 'No data available'}
                             </span>
                           </div>
                           
                           <div className="basic-analysis-field">
                             <label>Description:</label>
                             <div className="basic-analysis-description-text">
-                              {latestScan.aiAnalysis?.description || 'This device does not support AI analysis. Basic scan processing only.'}
+                              This device does not support AI analysis. Only raw barcode data is available. 
+                              To enable AI features, rename the device to include "AI" in the name (e.g., "RobridgeAI").
                             </div>
                           </div>
                         </div>
