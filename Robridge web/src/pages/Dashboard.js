@@ -20,12 +20,7 @@ const Dashboard = () => {
   const userRole = getUserRole();
   const [systemStatus, setSystemStatus] = useState(null);
   const [loading, setLoading] = useState(true);
-  const stats = [
-    { label: 'Total Scans', value: '1,247', icon: FaBarcode, color: '#E3821E' },
-    { label: 'Generated Codes', value: '892', icon: FaQrcode, color: '#E3821E' },
-    { label: 'Processed Images', value: '456', icon: FaImage, color: '#E3821E' },
-    { label: 'Robot Sessions', value: '78', icon: FaRobot, color: '#E3821E' }
-  ];
+  // Mock stats removed as requested
 
   const quickActions = [
     { 
@@ -105,6 +100,7 @@ const Dashboard = () => {
   const getStatusClass = (status) => {
     switch (status) {
       case 'connected':
+      case 'online':
       case 'optimal':
         return 'status-connected';
       case 'warning':
@@ -121,6 +117,8 @@ const Dashboard = () => {
     switch (status) {
       case 'connected':
         return 'Connected';
+      case 'online':
+        return 'Online';
       case 'optimal':
         return 'Optimal';
       case 'warning':
@@ -143,40 +141,29 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="stats-grid">
-        {stats.map((stat, index) => {
-          const Icon = stat.icon;
-          return (
-            <div key={index} className="stat-card" style={{ borderLeftColor: stat.color }}>
-              <div className="stat-icon" style={{ color: stat.color }}>
-                <Icon />
-              </div>
-              <div className="stat-content">
-                <div className="stat-value">{stat.value}</div>
-                <div className="stat-label">{stat.label}</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* Mock stats cards removed as requested */}
 
-      <div className="dashboard-content">
-        {/* Quick Actions - Hidden for Expo Users */}
+      <div className="dashboard-tiles">
+        {/* Quick Actions Tiles - Hidden for Expo Users */}
         {userRole !== ROLES.EXPO_USER && (
-          <div className="dashboard-section">
+          <div className="tiles-section">
             <h2>Quick Actions</h2>
-            <div className="quick-actions-grid">
+            <div className="tiles-grid">
               {quickActions.map((action, index) => {
                 const Icon = action.icon;
                 return (
-                  <Link key={index} to={action.path} className="quick-action-card">
-                    <div className="action-icon" style={{ backgroundColor: action.color }}>
-                      <Icon />
+                  <Link key={index} to={action.path} className="dashboard-tile">
+                    <div className="tile-header">
+                      <div className="tile-icon" style={{ backgroundColor: action.color }}>
+                        <Icon size={20} />
+                      </div>
+                      <div className="tile-title">{action.title}</div>
                     </div>
-                    <div className="action-content">
-                      <h3>{action.title}</h3>
+                    <div className="tile-content">
                       <p>{action.description}</p>
+                    </div>
+                    <div className="tile-footer">
+                      <span className="tile-arrow">→</span>
                     </div>
                   </Link>
                 );
@@ -186,82 +173,87 @@ const Dashboard = () => {
         )}
 
 
-        {/* System Status */}
-        <div className="dashboard-section">
+        {/* System Status Tiles */}
+        <div className="tiles-section">
           <h2>System Status</h2>
           {loading ? (
             <div className="status-loading">
               <p>Loading system status...</p>
             </div>
           ) : systemStatus ? (
-            <div className="status-grid">
-              <div className="status-card">
-                <div className="status-header">
-                  <FaDatabase />
-                  <span>Database</span>
+            <div className="tiles-grid">
+              <div className="dashboard-tile status-tile">
+                <div className="tile-header">
+                  <div className="tile-icon" style={{ backgroundColor: '#4CAF50' }}>
+                    <FaDatabase size={20} />
+                  </div>
+                  <div className="tile-title">Database</div>
                 </div>
-                <div className={`status-indicator ${getStatusClass(systemStatus.database.status)}`}>
-                  {getStatusText(systemStatus.database.status)}
-                </div>
-                <div className="status-detail">
-                  {systemStatus.database.message}
-                </div>
-              </div>
-              
-              <div className="status-card">
-                <div className="status-header">
-                  <FaServer />
-                  <span>AI Server</span>
-                </div>
-                <div className={`status-indicator ${getStatusClass(systemStatus.aiServer.status)}`}>
-                  {getStatusText(systemStatus.aiServer.status)}
-                </div>
-                <div className="status-detail">
-                  {systemStatus.aiServer.message}
+                <div className="tile-content">
+                  <div className={`status-indicator ${getStatusClass(systemStatus.database || 'connected')}`}>
+                    {getStatusText(systemStatus.database || 'connected')}
+                  </div>
+                  <p>Database connection status</p>
                 </div>
               </div>
               
-              <div className="status-card">
-                <div className="status-header">
-                  <FaRobot />
-                  <span>ESP32 Devices</span>
+              <div className="dashboard-tile status-tile">
+                <div className="tile-header">
+                  <div className="tile-icon" style={{ backgroundColor: '#2196F3' }}>
+                    <FaServer size={20} />
+                  </div>
+                  <div className="tile-title">Server</div>
                 </div>
-                <div className={`status-indicator ${getStatusClass(systemStatus.esp32Devices.status)}`}>
-                  {getStatusText(systemStatus.esp32Devices.status)}
-                </div>
-                <div className="status-detail">
-                  {systemStatus.esp32Devices.message}
-                </div>
-              </div>
-              
-              <div className="status-card">
-                <div className="status-header">
-                  <FaWifi />
-                  <span>WebSocket</span>
-                </div>
-                <div className={`status-indicator ${getStatusClass(systemStatus.websocket.status)}`}>
-                  {getStatusText(systemStatus.websocket.status)}
-                </div>
-                <div className="status-detail">
-                  {systemStatus.websocket.message}
+                <div className="tile-content">
+                  <div className={`status-indicator ${getStatusClass(systemStatus.server || 'online')}`}>
+                    {getStatusText(systemStatus.server || 'online')}
+                  </div>
+                  <p>Web server status</p>
                 </div>
               </div>
               
-              <div className="status-card">
-                <div className="status-header">
-                  <FaChartLine />
-                  <span>Performance</span>
+              <div className="dashboard-tile status-tile">
+                <div className="tile-header">
+                  <div className="tile-icon" style={{ backgroundColor: '#FF9800' }}>
+                    <FaRobot size={20} />
+                  </div>
+                  <div className="tile-title">Scanner Device</div>
                 </div>
-                <div className={`status-indicator ${getStatusClass(systemStatus.performance.status)}`}>
-                  {getStatusText(systemStatus.performance.status)}
+                <div className="tile-content">
+                  <div className={`status-indicator ${systemStatus.devices?.connected > 0 ? 'status-connected' : 'status-warning'}`}>
+                    {systemStatus.devices?.connected || 0} Connected
+                  </div>
+                  <p>Total: {systemStatus.devices?.total || 0} devices</p>
                 </div>
-                <div className="status-detail">
-                  {systemStatus.performance.message}
-                  {systemStatus.performance.metrics && (
-                    <div className="performance-metrics">
-                      <small>Memory: {systemStatus.performance.metrics.memoryUsage}% | Uptime: {Math.floor(systemStatus.performance.metrics.uptime / 3600)}h</small>
-                    </div>
-                  )}
+              </div>
+              
+              <div className="dashboard-tile status-tile">
+                <div className="tile-header">
+                  <div className="tile-icon" style={{ backgroundColor: '#9C27B0' }}>
+                    <FaWifi size={20} />
+                  </div>
+                  <div className="tile-title">Scans</div>
+                </div>
+                <div className="tile-content">
+                  <div className={`status-indicator ${systemStatus.scans?.total > 0 ? 'status-connected' : 'status-warning'}`}>
+                    {systemStatus.scans?.total || 0} Total
+                  </div>
+                  <p>Today: {systemStatus.scans?.today || 0} scans</p>
+                </div>
+              </div>
+              
+              <div className="dashboard-tile status-tile">
+                <div className="tile-header">
+                  <div className="tile-icon" style={{ backgroundColor: '#607D8B' }}>
+                    <FaChartLine size={20} />
+                  </div>
+                  <div className="tile-title">Uptime</div>
+                </div>
+                <div className="tile-content">
+                  <div className="status-indicator status-connected">
+                    {Math.floor((systemStatus.uptime || 0) / 3600)}h
+                  </div>
+                  <p>Server uptime</p>
                 </div>
               </div>
             </div>
