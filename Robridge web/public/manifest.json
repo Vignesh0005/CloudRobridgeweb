@@ -3,12 +3,12 @@
   "name": "RobBridge UI - Robot Control and Barcode Management",
   "icons": [
     {
-      "src": "robridge-logo.png",
+      "src": "static/media/robridge-logo.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "robridge-logo.png",
+      "src": "static/media/robridge-logo.png",
       "sizes": "512x512",
       "type": "image/png"
     }

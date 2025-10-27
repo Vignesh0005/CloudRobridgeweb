@@ -79,7 +79,7 @@ const LoginPage = () => {
       <div className="login-center">
         <div className="login-header">
           <img 
-            src="/robridge-logo.png" 
+            src="/static/media/robridge-logo.png" 
             alt="Robridge Logo" 
             className="logo-image"
             onError={(e) => {

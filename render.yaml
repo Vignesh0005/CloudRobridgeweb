@@ -8,6 +8,9 @@ services:
     staticPublishPath: ./Robridge web/build
     routes:
       - type: rewrite
+        source: /static/*
+        destination: /static/*
+      - type: rewrite
         source: /*
         destination: /index.html
     envVars:
@@ -38,4 +41,4 @@ services:
     startCommand: python server.py
     envVars:
       - key: OPENAI_API_KEY
-        value: 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
+        sync: false

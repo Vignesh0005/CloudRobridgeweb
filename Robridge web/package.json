@@ -37,7 +37,7 @@
     "server": "node server.js",
     "dev": "concurrently \"npm run server\" \"npm run start\"",
     "setup": "npm install && cd \"../Barcode generator&Scanner\" && pip install -r requirements.txt && cd \"../Robridge web\" && echo \"âœ… Setup complete! Run 'npm run dev' to start the system.\"",
-    "build": "react-scripts build",
+    "build": "react-scripts build && node -e \"const fs=require('fs'); fs.mkdirSync('build/static/media', {recursive: true}); fs.copyFileSync('public/robridge-logo.png', 'build/static/media/robridge-logo.png')\"",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
