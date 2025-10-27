@@ -1743,7 +1743,7 @@ void loop() {
         display.println("Processing barcode:");
         display.println(barcodeData);
         display.display();
-        delay(2000);
+        delay(1000);
         
         // Show basic scan info without AI
         displayBasicScanInfo(barcodeData);
@@ -1779,7 +1779,7 @@ void displayBasicScanInfo(String barcodeData) {
   display.println("No AI analysis");
   display.println("Basic processing");
   display.display();
-  delay(3000);
+  delay(2000);
 }
 
 // Function to send basic scan data to Robridge server (without AI analysis)

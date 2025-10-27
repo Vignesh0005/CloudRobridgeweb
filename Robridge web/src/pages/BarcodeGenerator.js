@@ -27,9 +27,10 @@ const BarcodeGenerator = () => {
   const [backendStatus, setBackendStatus] = useState('checking'); // 'checking', 'running', 'starting', 'error'
 
   // API URLs - automatically detect environment
-  const API_BASE_URL = process.env.NODE_ENV === 'production' 
-    ? '' // Use relative URLs in production (Vercel)
-    : 'http://localhost:3001';
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 
+    (process.env.NODE_ENV === 'production' 
+      ? 'https://robridge-express.onrender.com' 
+      : 'http://localhost:3001');
   
 
   const barcodeTypes = [

@@ -1,4 +1,21 @@
 services:
+  # React Frontend (Static Site)
+  - type: static
+    name: robridge-frontend
+    env: static
+    plan: free
+    buildCommand: cd "Robridge web" && npm install && npm run build
+    staticPublishPath: ./Robridge web/build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://robridge-express.onrender.com
+      - key: REACT_APP_AI_SERVER_URL
+        value: https://robridge-ai.onrender.com
+
   # Express.js Backend Server (API Only)
   - type: web
     name: robridge-express
@@ -9,8 +26,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
       - key: AI_SERVER_URL
         value: https://robridge-ai.onrender.com
 
@@ -22,7 +37,5 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python server.py
     envVars:
-      - key: PORT
-        value: 10000
       - key: OPENAI_API_KEY
         value: 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
