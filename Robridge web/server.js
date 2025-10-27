@@ -4,7 +4,7 @@ const path = require('path');
 const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 
 const app = express();
 const server = http.createServer(app);
@@ -42,27 +42,27 @@ let esp32Devices = new Map();
 let lastBarcodeScan = null;
 
 // Database connection
-const dbPath = path.join(__dirname, '..', 'Barcode generator&Scanner', 'barcodes.db');
-let db = null;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
 // Initialize database connection
-const initDatabase = () => {
-  return new Promise((resolve, reject) => {
-    db = new sqlite3.Database(dbPath, (err) => {
-      if (err) {
-        console.error('Error opening database:', err);
-        reject(err);
-      } else {
-        console.log('Connected to barcodes database');
-        resolve();
-      }
-    });
-  });
+const initDatabase = async () => {
+  try {
+    const client = await pool.connect();
+    console.log('Connected to PostgreSQL database');
+    client.release();
+    return Promise.resolve();
+  } catch (err) {
+    console.error('Error connecting to database:', err);
+    return Promise.reject(err);
+  }
 };
 
 // Function to save barcode scan to database
-const saveBarcodeScan = (scanData) => {
-  return new Promise((resolve, reject) => {
+const saveBarcodeScan = async (scanData) => {
+  try {
     const {
       barcodeData,
       deviceName,
@@ -82,12 +82,13 @@ const saveBarcodeScan = (scanData) => {
     const barcodeId = `SCAN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const timestamp = new Date().toISOString();
 
-    const sql = `
+    const query = `
       INSERT INTO barcodes (
         barcode_id, barcode_data, barcode_type, source, product_name, 
         product_id, price, location_x, location_y, location_z, 
         category, file_path, metadata, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING id
     `;
 
     const values = [
@@ -96,16 +97,13 @@ const saveBarcodeScan = (scanData) => {
       category, '', JSON.stringify(metadata), timestamp
     ];
 
-    db.run(sql, values, function(err) {
-      if (err) {
-        console.error('Error saving barcode scan:', err);
-        reject(err);
-      } else {
-        console.log(`Barcode scan saved with ID: ${this.lastID}`);
-        resolve({ id: this.lastID, barcodeId });
-      }
-    });
-  });
+    const result = await pool.query(query, values);
+    console.log(`Barcode scan saved with ID: ${result.rows[0].id}`);
+    return { id: result.rows[0].id, barcodeId };
+  } catch (error) {
+    console.error('Error saving barcode scan:', error);
+    throw error;
+  }
 };
 
 // Function to get all scanned barcodes
@@ -839,11 +837,11 @@ async function callAIForProductAnalysis(barcode) {
 }
 
 // Create barcodes table if it doesn't exist
-const initBarcodesTable = () => {
-  return new Promise((resolve, reject) => {
-    const sql = `
+const initBarcodesTable = async () => {
+  try {
+    const query = `
       CREATE TABLE IF NOT EXISTS barcodes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         barcode_id TEXT,
         barcode_data TEXT,
         barcode_type TEXT,
@@ -857,28 +855,24 @@ const initBarcodesTable = () => {
         category TEXT,
         file_path TEXT,
         metadata TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `;
     
-    db.run(sql, (err) => {
-      if (err) {
-        console.error('Error creating barcodes table:', err);
-        reject(err);
-      } else {
-        console.log('✅ Barcodes table created/verified');
-        resolve();
-      }
-    });
-  });
+    await pool.query(query);
+    console.log('✅ Barcodes table created/verified');
+  } catch (error) {
+    console.error('Error creating barcodes table:', error);
+    throw error;
+  }
 };
 
 // Create saved_scans table if it doesn't exist
-const initSavedScansTable = () => {
-  return new Promise((resolve, reject) => {
-    const sql = `
+const initSavedScansTable = async () => {
+  try {
+    const query = `
       CREATE TABLE IF NOT EXISTS saved_scans (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         barcode_data TEXT NOT NULL,
         barcode_type TEXT NOT NULL,
         source TEXT NOT NULL,
@@ -891,29 +885,22 @@ const initSavedScansTable = () => {
       )
     `;
     
-    db.run(sql, (err) => {
-      if (err) {
-        console.error('❌ Error creating saved_scans table:', err);
-        reject(err);
-      } else {
-        console.log('✅ saved_scans table ready');
-        
-        // Verify the table was created
-        db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='saved_scans'", (err, row) => {
-          if (err) {
-            console.error('❌ Error verifying saved_scans table:', err);
-            reject(err);
-          } else if (row) {
-            console.log('✅ saved_scans table verified');
-            resolve();
-          } else {
-            console.error('❌ saved_scans table was not created');
-            reject(new Error('Table creation failed'));
-          }
-        });
-      }
-    });
-  });
+    await pool.query(query);
+    console.log('✅ saved_scans table ready');
+    
+    // Verify the table was created
+    const verifyQuery = "SELECT table_name FROM information_schema.tables WHERE table_name = 'saved_scans'";
+    const result = await pool.query(verifyQuery);
+    
+    if (result.rows.length > 0) {
+      console.log('✅ saved_scans table verified');
+    } else {
+      throw new Error('Table creation failed');
+    }
+  } catch (error) {
+    console.error('❌ Error creating saved_scans table:', error);
+    throw error;
+  }
 };
 
 // Save a scan to saved_scans table
@@ -1733,7 +1720,7 @@ const startServer = async () => {
     console.log(`🤖 AI Server: ${AI_SERVER_URL}`);
     console.log(`🏷️  Flask Server: http://localhost:5000`);
     console.log(`🔌 WebSocket server active on port ${PORT}`);
-    console.log(`🗄️  Database: ${db ? 'Connected' : 'Not connected'}`);
+    console.log(`🗄️  Database: PostgreSQL (${process.env.DATABASE_URL ? 'Connected' : 'Not configured'})`);
     if (NODE_ENV === 'production') {
       console.log(`🌐 Production URL: https://robridge-express.onrender.com`);
     } else {
