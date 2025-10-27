@@ -44,12 +44,23 @@ let lastBarcodeScan = null;
 // Database connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 20
 });
 
 // Initialize database connection
 const initDatabase = async () => {
   try {
+    console.log('🔍 Database connection details:');
+    console.log('   DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
+    console.log('   NODE_ENV:', process.env.NODE_ENV);
+    
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+    
     const client = await pool.connect();
     console.log('Connected to PostgreSQL database');
     client.release();
@@ -107,27 +118,24 @@ const saveBarcodeScan = async (scanData) => {
 };
 
 // Function to get all scanned barcodes
-const getAllScannedBarcodes = (limit = 100, offset = 0) => {
-  return new Promise((resolve, reject) => {
-    const sql = `
+const getAllScannedBarcodes = async (limit = 100, offset = 0) => {
+  try {
+    const query = `
       SELECT 
         id, barcode_id, barcode_data, barcode_type, source, 
         product_name, product_id, price, location_x, location_y, location_z,
         category, file_path, metadata, created_at
       FROM barcodes 
       ORDER BY created_at DESC 
-      LIMIT ? OFFSET ?
+      LIMIT $1 OFFSET $2
     `;
 
-    db.all(sql, [limit, offset], (err, rows) => {
-      if (err) {
-        console.error('Error fetching barcodes:', err);
-        reject(err);
-      } else {
-        resolve(rows);
-      }
-    });
-  });
+    const result = await pool.query(query, [limit, offset]);
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching barcodes:', error);
+    throw error;
+  }
 };
 
 // Health check endpoint
@@ -574,7 +582,7 @@ app.get('/api/barcodes/scanned', async (req, res) => {
   try {
     const { limit = 100, offset = 0, source } = req.query;
     
-    let sql = `
+    let query = `
       SELECT 
         id, barcode_id, barcode_data, barcode_type, source, 
         product_name, product_id, price, location_x, location_y, location_z,
@@ -583,31 +591,25 @@ app.get('/api/barcodes/scanned', async (req, res) => {
     `;
     
     const params = [];
+    let paramIndex = 1;
     
     if (source) {
-      sql += ' WHERE source = ?';
+      query += ' WHERE source = $' + paramIndex;
       params.push(source);
+      paramIndex++;
     }
     
-    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    query += ' ORDER BY created_at DESC LIMIT $' + paramIndex + ' OFFSET $' + (paramIndex + 1);
     params.push(parseInt(limit), parseInt(offset));
     
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        console.error('Error fetching scanned barcodes:', err);
-        res.status(500).json({ 
-          success: false, 
-          error: 'Failed to fetch scanned barcodes' 
-        });
-      } else {
-        res.json({ 
-          success: true, 
-          barcodes: rows,
-          total: rows.length,
-          limit: parseInt(limit),
-          offset: parseInt(offset)
-        });
-      }
+    const result = await pool.query(query, params);
+    
+    res.json({ 
+      success: true, 
+      barcodes: result.rows,
+      total: result.rows.length,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
     });
   } catch (error) {
     console.error('Error getting scanned barcodes:', error);
@@ -625,27 +627,22 @@ app.delete('/api/barcodes/:id', async (req, res) => {
     
     console.log(`🗑️ Deleting barcode with ID: ${id}`);
     
-    db.run('DELETE FROM barcodes WHERE id = ?', [id], function(err) {
-      if (err) {
-        console.error('❌ Error deleting barcode:', err);
-        res.status(500).json({ 
-          success: false, 
-          error: 'Failed to delete barcode' 
-        });
-      } else if (this.changes === 0) {
-        console.log('⚠️ No barcode found with ID:', id);
-        res.status(404).json({ 
-          success: false, 
-          error: 'Barcode not found' 
-        });
-      } else {
-        console.log('✅ Barcode deleted successfully');
-        res.json({ 
-          success: true, 
-          message: 'Barcode deleted successfully' 
-        });
-      }
-    });
+    const result = await pool.query('DELETE FROM barcodes WHERE id = $1', [id]);
+    
+    if (result.rowCount === 0) {
+      console.log('⚠️ No barcode found with ID:', id);
+      res.status(404).json({ 
+        success: false, 
+        error: 'Barcode not found' 
+      });
+    } else {
+      console.log(`✅ Barcode deleted successfully. Changes: ${result.rowCount}`);
+      res.json({ 
+        success: true, 
+        message: 'Barcode deleted successfully',
+        changes: result.rowCount
+      });
+    }
   } catch (error) {
     console.error('❌ Error deleting barcode:', error);
     res.status(500).json({ 
