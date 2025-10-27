@@ -32,9 +32,7 @@ services:
       - key: AI_SERVER_URL
         value: https://robridge-ai.onrender.com
       - key: DATABASE_URL
-        fromDatabase:
-          name: BarcodesDb
-          property: connectionString
+        value: postgresql://barcodesdb_user:p24RV0pw4Al5fEcgzAkjNE0epHZYfBEs@dpg-d3vo8rur433s73arsjk0-a/barcodesdb
 
   # AI Analysis Server (FastAPI)
   - type: web
