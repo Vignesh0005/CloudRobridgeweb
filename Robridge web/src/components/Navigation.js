@@ -95,7 +95,7 @@ const Navigation = () => {
     <nav className={`navigation ${isCollapsed ? 'collapsed' : ''} ${userRole === ROLES.EXPO_USER ? 'expo-navigation' : userRole === ROLES.ADMIN ? 'admin-navigation' : userRole === ROLES.FULL_ACCESS ? 'full-access-navigation' : ''}`}>
       <div className="nav-header">
         <div className={`nav-logo ${userRole === ROLES.EXPO_USER ? 'expo-logo' : userRole === ROLES.ADMIN ? 'admin-logo' : userRole === ROLES.FULL_ACCESS ? 'full-access-logo' : ''}`}>
-          <img src="/logo.png" alt="RobBridge Logo" className={`logo-image ${userRole === ROLES.EXPO_USER ? 'expo-logo-image' : userRole === ROLES.ADMIN ? 'admin-logo-image' : userRole === ROLES.FULL_ACCESS ? 'full-access-logo-image' : ''}`} />
+          <img src="/robridge-logo.png" alt="RobBridge Logo" className={`logo-image ${userRole === ROLES.EXPO_USER ? 'expo-logo-image' : userRole === ROLES.ADMIN ? 'admin-logo-image' : userRole === ROLES.FULL_ACCESS ? 'full-access-logo-image' : ''}`} />
         </div>
         <button className="nav-toggle" onClick={toggleCollapse}>
           {isCollapsed ? <FaBars /> : <FaTimes />}
