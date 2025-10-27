@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaEye, FaEyeSlash, FaLock, FaEnvelope, FaSignInAlt, FaUser, FaShieldAlt, FaCrown } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaLock, FaEnvelope, FaSignInAlt, FaUser } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 import './LoginPage.css';
 
@@ -189,36 +189,6 @@ const LoginPage = () => {
               <div className="btn-content">
                 <span className="btn-title">Expo User</span>
                 <span className="btn-subtitle">Dashboard, Scanner, Device</span>
-              </div>
-            </button>
-            
-            <button 
-              type="button" 
-              className="credential-btn admin-btn"
-              onClick={() => {
-                setFormData({ email: 'admin@admin.robridge.com', password: 'admin123' });
-              }}
-              disabled={isLoading}
-            >
-              <FaShieldAlt />
-              <div className="btn-content">
-                <span className="btn-title">Admin Access</span>
-                <span className="btn-subtitle">Full Access + Admin Controls</span>
-              </div>
-            </button>
-            
-            <button 
-              type="button" 
-              className="credential-btn full-btn"
-              onClick={() => {
-                setFormData({ email: 'user@robridge.com', password: 'full123' });
-              }}
-              disabled={isLoading}
-            >
-              <FaCrown />
-              <div className="btn-content">
-                <span className="btn-title">Full Access</span>
-                <span className="btn-subtitle">All Features</span>
               </div>
             </button>
           </div>
