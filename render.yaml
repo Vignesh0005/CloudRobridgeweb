@@ -1,0 +1,28 @@
+services:
+  # Express.js Backend Server (API Only)
+  - type: web
+    name: robridge-express
+    env: node
+    plan: free
+    buildCommand: cd "Robridge web" && npm install
+    startCommand: cd "Robridge web" && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: AI_SERVER_URL
+        value: https://robridge-ai.onrender.com
+
+  # AI Analysis Server (FastAPI)
+  - type: web
+    name: robridge-ai
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: OPENAI_API_KEY
+        value: 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
