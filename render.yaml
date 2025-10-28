@@ -16,6 +16,10 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
     envVars:
       - key: REACT_APP_API_URL
         value: https://robridge-express.onrender.com

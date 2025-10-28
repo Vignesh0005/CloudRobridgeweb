@@ -365,7 +365,7 @@ String cleanBarcode(String rawData) {
 
 // Function to manually wake up sleeping Render servers
 void wakeUpRenderServer(String serverURL) {
-  debugPrint("🔔 Attempting to wake up Render server...");
+  debugPrint("Attempting to wake up Render server...");
   
   // Try simple HTTP GET to wake up the server
   HTTPClient http;
@@ -425,7 +425,7 @@ bool testServerConnection(String serverURL) {
         String response = http.getString();
         debugPrint("HTTP Response: " + response.substring(0, min(100, (int)response.length())));
         http.end();
-        debugPrint("✅ Server is awake and responding!");
+        debugPrint("Server is awake and responding!");
         return true; // Found a working endpoint
       }
       
@@ -454,7 +454,7 @@ bool testServerConnection(String serverURL) {
           String response = http.getString();
           debugPrint("HTTPS Response: " + response.substring(0, min(100, (int)response.length())));
           http.end();
-          debugPrint("✅ HTTPS connection successful!");
+          debugPrint("HTTPS connection successful!");
           return true;
         }
       } else {
@@ -467,13 +467,13 @@ bool testServerConnection(String serverURL) {
     
     // If this attempt failed and we have more attempts, wait before retrying
     if (attempt < 3) {
-      debugPrint("⚠️ Attempt " + String(attempt) + " failed. Waiting 5 seconds before retry...");
-      debugPrint("💤 Server might be sleeping. Trying to wake it up...");
+      debugPrint("Attempt " + String(attempt) + " failed. Waiting 5 seconds before retry...");
+      debugPrint("erver might be sleeping. Trying to wake it up...");
       delay(5000); // Wait 5 seconds between attempts
     }
   }
   
-  debugPrint("❌ All connection attempts failed. Server may be down or DNS issue.");
+  debugPrint("All connection attempts failed. Server may be down or DNS issue.");
   return false;
 }
 
@@ -1228,7 +1228,7 @@ void displayText(String text, int startY = 0) {
       display.println(processedLines[i]);
     }
     display.display();
-    delay(800); // Show initial content for 0.8 seconds (much faster)
+    delay(400); // Show initial content for 0.8 seconds (much faster)
     
     // Scroll through the content
     for (int scroll = 0; scroll <= processedLineCount - maxLines; scroll++) {
@@ -1249,11 +1249,10 @@ void displayText(String text, int startY = 0) {
       }
       
       // Add page indicator
-      display.setCursor(110, 0);
-      display.print(String(scroll + 1) + "/" + String(processedLineCount - maxLines + 1));
+      
       
       display.display();
-      delay(1000); // Show each screen for 1 second (much faster)
+      delay(500); // Show each screen for 1 second (much faster)
     }
   } else {
     // Content fits on screen, display normally
@@ -1739,11 +1738,9 @@ void loop() {
         display.setTextColor(SH110X_WHITE);
         display.setCursor(0, 0);
         display.println("Basic Scan");
-        display.println("");
-        display.println("Processing barcode:");
         display.println(barcodeData);
         display.display();
-        delay(1000);
+        delay(300);
         
         // Show basic scan info without AI
         displayBasicScanInfo(barcodeData);
@@ -1771,15 +1768,12 @@ void displayBasicScanInfo(String barcodeData) {
   display.setTextSize(1);
   display.setTextColor(SH110X_WHITE);
   display.setCursor(0, 0);
-  display.println("Basic Scan Result");
-  display.println("");
   display.println("Barcode: " + barcodeData);
   display.println("");
   display.println("Device: " + deviceName);
-  display.println("No AI analysis");
-  display.println("Basic processing");
+  display.println("processing");
   display.display();
-  delay(2000);
+  delay(700);
 }
 
 // Function to send basic scan data to Robridge server (without AI analysis)
