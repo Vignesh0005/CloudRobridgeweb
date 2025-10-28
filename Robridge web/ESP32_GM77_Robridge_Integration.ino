@@ -40,8 +40,8 @@ String aiServerURL = "https://robridge-ai.onrender.com";  // AI server - Render 
 String customServerIP = "";  // Custom server IP from portal
 
 // --- ESP32 Device Configuration ---
-const String deviceId = "RobridgeAI";
-const String deviceName = "RobridgeAI";
+const String deviceId = "Robridge";
+const String deviceName = "Robridge";
 const String firmwareVersion = "2.0.0";
 
 // --- Gemini API Configuration ---

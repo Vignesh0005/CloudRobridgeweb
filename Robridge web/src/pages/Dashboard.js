@@ -72,7 +72,9 @@ const Dashboard = () => {
     const fetchSystemStatus = async () => {
       try {
         setLoading(true);
-        const serverURL = 'https://robridge-express.onrender.com';
+        const serverURL = process.env.NODE_ENV === 'production' 
+          ? 'https://robridge-express.onrender.com' 
+          : 'http://localhost:3001';
         const response = await fetch(`${serverURL}/api/system/status`);
         const data = await response.json();
         

@@ -161,7 +161,9 @@ export const WebSocketProvider = ({ children }) => {
   useEffect(() => {
 
     // Create WebSocket connection
-    const serverURL = 'https://robridge-express.onrender.com'; // Always use Render backend
+    const serverURL = process.env.NODE_ENV === 'production' 
+      ? 'https://robridge-express.onrender.com' 
+      : 'http://localhost:3001';
     
     socketRef.current = io(serverURL, {
       transports: ['websocket', 'polling'],

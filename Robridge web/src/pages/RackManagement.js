@@ -77,7 +77,10 @@ const RackManagement = () => {
       if (filterStatus !== 'all') params.append('status', filterStatus);
       
       console.log('Loading racks with params:', params.toString());
-      const response = await fetch(`https://robridge-express.onrender.com/api/racks?${params.toString()}`);
+      const serverURL = process.env.NODE_ENV === 'production' 
+        ? 'https://robridge-express.onrender.com' 
+        : 'http://localhost:3001';
+      const response = await fetch(`${serverURL}/api/racks?${params.toString()}`);
       console.log('Racks response status:', response.status);
       
       if (!response.ok) {

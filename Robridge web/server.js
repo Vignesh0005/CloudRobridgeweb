@@ -10,8 +10,9 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
+    origin: ["https://robridgelabs.com", "https://www.robridgelabs.com", "http://localhost:3000", "http://localhost:8080"],
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -30,9 +31,21 @@ const redirectApp = express();
 const REDIRECT_PORT = 3003;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ["https://robridgelabs.com", "https://www.robridgelabs.com", "http://localhost:3000", "http://localhost:8080"],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 app.use(express.json());
-// No static file serving - backend API only
+
+// Serve static files from React build directory for /bvs subdirectory
+app.use('/bvs', express.static(path.join(__dirname, 'build')));
+
+// Handle React routing for /bvs subdirectory - return index.html for all non-API routes
+app.get('/bvs/*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
 
 // Store the Python process
 let pythonProcess = null;

@@ -15,6 +15,7 @@
     "html2canvas": "^1.4.1",
     "jsbarcode": "^3.12.1",
     "jspdf": "^3.0.1",
+    "pg": "^8.11.3",
     "quagga": "^0.6.16",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -25,20 +26,21 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "sqlite3": "^5.1.7",
-    "pg": "^8.11.3",
     "styled-components": "^5.3.9",
     "web-vitals": "^2.1.4",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3"
   },
   "scripts": {
     "start": "react-scripts start",
     "server": "node server.js",
     "dev": "concurrently \"npm run server\" \"npm run start\"",
     "setup": "npm install && cd \"../Barcode generator&Scanner\" && pip install -r requirements.txt && cd \"../Robridge web\" && echo \"âœ… Setup complete! Run 'npm run dev' to start the system.\"",
-    "build": "react-scripts build && node -e \"const fs=require('fs'); if(fs.existsSync('public/robridge-logo.png')) { fs.mkdirSync('build/static/media', {recursive: true}); fs.copyFileSync('public/robridge-logo.png', 'build/static/media/robridge-logo.png'); console.log('Logo copied successfully'); } else { console.log('Logo file not found, skipping copy'); }\"",
+    "build": "cross-env PUBLIC_URL=/bvs react-scripts build && node -e \"const fs=require('fs'); if(fs.existsSync('public/robridge-logo.png')) { fs.mkdirSync('build/static/media', {recursive: true}); fs.copyFileSync('public/robridge-logo.png', 'build/static/media/robridge-logo.png'); console.log('Logo copied successfully'); } else { console.log('Logo file not found, skipping copy'); }\"",
+    "build-standalone": "react-scripts build && node -e \"const fs=require('fs'); if(fs.existsSync('public/robridge-logo.png')) { fs.mkdirSync('build/static/media', {recursive: true}); fs.copyFileSync('public/robridge-logo.png', 'build/static/media/robridge-logo.png'); console.log('Logo copied successfully'); } else { console.log('Logo file not found, skipping copy'); }\"",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
