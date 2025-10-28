@@ -653,7 +653,7 @@ app.delete('/api/barcodes/:id', async (req, res) => {
 });
 
 // ESP32 Database Lookup Endpoint
-app.get('/api/barcodes/lookup/:barcode', (req, res) => {
+app.get('/api/barcodes/lookup/:barcode', async (req, res) => {
   try {
     const { barcode } = req.params;
     
@@ -662,49 +662,44 @@ app.get('/api/barcodes/lookup/:barcode', (req, res) => {
         barcode_data, product_name, category, price, location_x, location_y, location_z,
         metadata, created_at
       FROM barcodes 
-      WHERE barcode_data = ?
+      WHERE barcode_data = $1
       ORDER BY created_at DESC 
       LIMIT 1
     `;
     
-    db.get(sql, [barcode], (err, row) => {
-      if (err) {
-        console.error('Error looking up barcode:', err);
-        res.status(500).json({ 
-          success: false, 
-          error: 'Database lookup failed' 
-        });
-      } else if (row) {
-        // Parse metadata for additional product info
-        let metadata = {};
-        try {
-          metadata = JSON.parse(row.metadata || '{}');
-        } catch (e) {
-          metadata = {};
-        }
-        
-        res.json({ 
-          success: true, 
-          product: {
-            barcode: row.barcode_data,
-            name: row.product_name || 'Unknown Product',
-            type: row.category || 'Unknown',
-            details: metadata.productDetails || 'No details available',
-            price: row.price ? `$${row.price}` : 'Price not available',
-            category: row.category || 'Unknown',
-            location: `X:${row.location_x}, Y:${row.location_y}, Z:${row.location_z}`,
-            foundInDatabase: true,
-            lastScanned: row.created_at
-          }
-        });
-      } else {
-        res.json({ 
-          success: false, 
-          message: 'Barcode not found in database',
-          product: null
-        });
+    const result = await pool.query(sql, [barcode]);
+    const row = result.rows[0];
+    
+    if (row) {
+      // Parse metadata for additional product info
+      let metadata = {};
+      try {
+        metadata = JSON.parse(row.metadata || '{}');
+      } catch (e) {
+        metadata = {};
       }
-    });
+      
+      res.json({ 
+        success: true, 
+        product: {
+          barcode: row.barcode_data,
+          name: row.product_name || 'Unknown Product',
+          type: row.category || 'Unknown',
+          details: metadata.productDetails || 'No details available',
+          price: row.price ? `$${row.price}` : 'Price not available',
+          category: row.category || 'Unknown',
+          location: `X:${row.location_x}, Y:${row.location_y}, Z:${row.location_z}`,
+          foundInDatabase: true,
+          lastScanned: row.created_at
+        }
+      });
+    } else {
+      res.json({ 
+        success: false, 
+        message: 'Barcode not found in database',
+        product: null
+      });
+    }
   } catch (error) {
     console.error('Error in barcode lookup:', error);
     res.status(500).json({ 
@@ -901,7 +896,7 @@ const initSavedScansTable = async () => {
 };
 
 // Save a scan to saved_scans table
-app.post('/api/save-scan', (req, res) => {
+app.post('/api/save-scan', async (req, res) => {
   try {
     const { barcode_data, barcode_type, source, product_name, category, price, description, metadata } = req.body;
     
@@ -935,22 +930,14 @@ app.post('/api/save-scan', (req, res) => {
     // First, check if this barcode was already saved recently (within last 5 minutes)
     const checkDuplicateSQL = `
       SELECT id, saved_at FROM saved_scans 
-      WHERE barcode_data = ? 
+      WHERE barcode_data = $1 
       ORDER BY saved_at DESC 
       LIMIT 1
     `;
 
-    db.get(checkDuplicateSQL, [barcode_data], (err, existingScan) => {
-      if (err) {
-        console.error('❌ Error checking for duplicates:', err);
-        console.error('   SQL:', checkDuplicateSQL);
-        console.error('   Barcode data:', barcode_data);
-        console.error('   Error message:', err.message);
-        return res.status(500).json({
-          success: false,
-          error: 'Failed to check for duplicates: ' + err.message
-        });
-      }
+    try {
+      const duplicateResult = await pool.query(checkDuplicateSQL, [barcode_data]);
+      const existingScan = duplicateResult.rows[0];
 
       // If scan exists and was saved within last 5 minutes, prevent duplicate
       if (existingScan) {
@@ -972,7 +959,8 @@ app.post('/api/save-scan', (req, res) => {
       // Save the scan if no recent duplicate found
       const sql = `
         INSERT INTO saved_scans (barcode_data, barcode_type, source, product_name, category, price, description, metadata)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id
       `;
 
       console.log('🔍 Attempting to save scan to database:', {
@@ -986,7 +974,7 @@ app.post('/api/save-scan', (req, res) => {
         metadata: JSON.stringify(metadata)
       });
 
-      db.run(sql, [
+      const result = await pool.query(sql, [
         barcode_data, 
         barcode_type, 
         source, 
@@ -995,28 +983,28 @@ app.post('/api/save-scan', (req, res) => {
         price, 
         description,
         JSON.stringify(metadata)
-      ], function(err) {
-        if (err) {
-          console.error('❌ Error saving scan to database:', err);
-          console.error('❌ SQL Error details:', {
-            message: err.message,
-            code: err.code,
-            sql: sql
-          });
-          res.status(500).json({
-            success: false,
-            error: 'Failed to save scan: ' + err.message
-          });
-        } else {
-          console.log(`✅ Scan saved to saved_scans table. ID: ${this.lastID}`);
-          res.json({
-            success: true,
-            message: 'Scan saved successfully',
-            savedId: this.lastID
-          });
-        }
+      ]);
+
+      console.log(`✅ Scan saved to saved_scans table. ID: ${result.rows[0].id}`);
+      res.json({
+        success: true,
+        message: 'Scan saved successfully',
+        savedId: result.rows[0].id
       });
-    });
+
+    } catch (dbError) {
+      console.error('❌ Error saving scan to database:', dbError);
+      console.error('❌ SQL Error details:', {
+        message: dbError.message,
+        code: dbError.code,
+        sql: sql
+      });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to save scan: ' + dbError.message
+      });
+    }
+
   } catch (error) {
     console.error('Error saving scan:', error);
     res.status(500).json({
@@ -1027,7 +1015,7 @@ app.post('/api/save-scan', (req, res) => {
 });
 
 // Get saved scans endpoint
-app.get('/api/saved-scans', (req, res) => {
+app.get('/api/saved-scans', async (req, res) => {
   try {
     const sql = `
       SELECT 
@@ -1037,26 +1025,19 @@ app.get('/api/saved-scans', (req, res) => {
       ORDER BY saved_at DESC
     `;
     
-    db.all(sql, [], (err, rows) => {
-      if (err) {
-        console.error('Error fetching saved scans:', err);
-        res.status(500).json({ 
-          success: false, 
-          error: 'Failed to fetch saved scans' 
-        });
-      } else {
-        // Format rows to match expected structure
-        const formattedRows = rows.map(row => ({
-          ...row,
-          created_at: row.saved_at,
-          scanned_at: row.saved_at
-        }));
-        
-        res.json({ 
-          success: true, 
-          savedScans: formattedRows
-        });
-      }
+    const result = await pool.query(sql);
+    const rows = result.rows;
+    
+    // Format rows to match expected structure
+    const formattedRows = rows.map(row => ({
+      ...row,
+      created_at: row.saved_at,
+      scanned_at: row.saved_at
+    }));
+    
+    res.json({ 
+      success: true, 
+      savedScans: formattedRows
     });
   } catch (error) {
     console.error('Error getting saved scans:', error);
@@ -1068,28 +1049,28 @@ app.get('/api/saved-scans', (req, res) => {
 });
 
 // Delete saved scan endpoint
-app.delete('/api/saved-scans/:id', (req, res) => {
+app.delete('/api/saved-scans/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const sql = `DELETE FROM saved_scans WHERE id = ?`;
+    const sql = `DELETE FROM saved_scans WHERE id = $1`;
     
-    db.run(sql, [id], function(err) {
-      if (err) {
-        console.error('Error deleting saved scan:', err);
-        res.status(500).json({ 
-          success: false, 
-          error: 'Failed to delete saved scan' 
-        });
-      } else {
-        console.log(`🗑️ Deleted saved scan ID: ${id}`);
-        res.json({ 
-          success: true, 
-          message: 'Saved scan deleted successfully',
-          deletedId: id
-        });
-      }
-    });
+    const result = await pool.query(sql, [id]);
+    
+    if (result.rowCount === 0) {
+      console.log('⚠️ No saved scan found with ID:', id);
+      res.status(404).json({ 
+        success: false, 
+        error: 'Saved scan not found' 
+      });
+    } else {
+      console.log(`🗑️ Deleted saved scan ID: ${id}`);
+      res.json({ 
+        success: true, 
+        message: 'Saved scan deleted successfully',
+        deletedId: id
+      });
+    }
   } catch (error) {
     console.error('Error deleting saved scan:', error);
     res.status(500).json({ 
@@ -1100,25 +1081,17 @@ app.delete('/api/saved-scans/:id', (req, res) => {
 });
 
 // Clear ALL saved scans endpoint
-app.delete('/api/saved-scans', (req, res) => {
+app.delete('/api/saved-scans', async (req, res) => {
   try {
     const sql = `DELETE FROM saved_scans`;
     
-    db.run(sql, [], function(err) {
-      if (err) {
-        console.error('Error clearing saved scans:', err);
-        res.status(500).json({ 
-          success: false, 
-          error: 'Failed to clear saved scans' 
-        });
-      } else {
-        console.log(`🗑️ Cleared all saved scans. ${this.changes} rows deleted.`);
-        res.json({ 
-          success: true, 
-          message: 'All saved scans cleared successfully',
-          deletedCount: this.changes
-        });
-      }
+    const result = await pool.query(sql);
+    
+    console.log(`🗑️ Cleared all saved scans. ${result.rowCount} rows deleted.`);
+    res.json({ 
+      success: true, 
+      message: 'All saved scans cleared successfully',
+      deletedCount: result.rowCount
     });
   } catch (error) {
     console.error('Error clearing saved scans:', error);
@@ -1130,25 +1103,17 @@ app.delete('/api/saved-scans', (req, res) => {
 });
 
 // Clear GM77_SCAN entries from saved scans
-app.delete('/api/saved-scans/gm77', (req, res) => {
+app.delete('/api/saved-scans/gm77', async (req, res) => {
   try {
     const sql = `DELETE FROM saved_scans WHERE barcode_type = 'GM77_SCAN'`;
     
-    db.run(sql, [], function(err) {
-      if (err) {
-        console.error('Error clearing GM77_SCAN entries:', err);
-        res.status(500).json({ 
-          success: false, 
-          error: 'Failed to clear GM77_SCAN entries' 
-        });
-      } else {
-        console.log(`🗑️ Cleared ${this.changes} GM77_SCAN entries from saved scans.`);
-        res.json({ 
-          success: true, 
-          message: 'GM77_SCAN entries cleared successfully',
-          deletedCount: this.changes
-        });
-      }
+    const result = await pool.query(sql);
+    
+    console.log(`🗑️ Cleared ${result.rowCount} GM77_SCAN entries from saved scans.`);
+    res.json({ 
+      success: true, 
+      message: 'GM77_SCAN entries cleared successfully',
+      deletedCount: result.rowCount
     });
   } catch (error) {
     console.error('Error clearing GM77_SCAN entries:', error);
@@ -1160,7 +1125,7 @@ app.delete('/api/saved-scans/gm77', (req, res) => {
 });
 
 // Get barcode statistics
-app.get('/api/barcodes/stats', (req, res) => {
+app.get('/api/barcodes/stats', async (req, res) => {
   try {
     const sql = `
       SELECT 
@@ -1171,39 +1136,32 @@ app.get('/api/barcodes/stats', (req, res) => {
       GROUP BY source, barcode_type
     `;
     
-    db.all(sql, [], (err, rows) => {
-      if (err) {
-        console.error('Error fetching barcode stats:', err);
-        res.status(500).json({ 
-          success: false, 
-          error: 'Failed to fetch statistics' 
-        });
-      } else {
-        const stats = {
-          bySource: {},
-          byType: {},
-          total: 0
-        };
-        
-        rows.forEach(row => {
-          stats.total += row.count;
-          
-          if (!stats.bySource[row.source]) {
-            stats.bySource[row.source] = 0;
-          }
-          stats.bySource[row.source] += row.count;
-          
-          if (!stats.byType[row.barcode_type]) {
-            stats.byType[row.barcode_type] = 0;
-          }
-          stats.byType[row.barcode_type] += row.count;
-        });
-        
-        res.json({ 
-          success: true, 
-          stats 
-        });
+    const result = await pool.query(sql);
+    const rows = result.rows;
+    
+    const stats = {
+      bySource: {},
+      byType: {},
+      total: 0
+    };
+    
+    rows.forEach(row => {
+      stats.total += parseInt(row.count);
+      
+      if (!stats.bySource[row.source]) {
+        stats.bySource[row.source] = 0;
       }
+      stats.bySource[row.source] += parseInt(row.count);
+      
+      if (!stats.byType[row.barcode_type]) {
+        stats.byType[row.barcode_type] = 0;
+      }
+      stats.byType[row.barcode_type] += parseInt(row.count);
+    });
+    
+    res.json({ 
+      success: true, 
+      stats 
     });
   } catch (error) {
     console.error('Error getting barcode statistics:', error);
